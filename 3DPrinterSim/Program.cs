@@ -13,6 +13,7 @@ using System.Runtime.InteropServices;
 using System.Diagnostics;
 using Hardware;
 using Firmware;
+using System.Windows.Forms;
 
 namespace PrinterSimulator
 {
@@ -20,7 +21,21 @@ namespace PrinterSimulator
     {
         static void PrintFile(PrinterControl simCtl)
         {
-            System.IO.StreamReader file = new System.IO.StreamReader("..\\..\\..\\SampleSTLs\\F-35_Corrected.gcode");
+            Console.Clear();
+            Console.WriteLine("\nDefault file will be used unless alternate file is given");
+            Console.WriteLine("Press any key to continue");
+            Console.ReadKey();
+            OpenFileDialog filePath = new OpenFileDialog();
+            string path = "";
+            if (filePath.ShowDialog() == DialogResult.OK)
+            {
+                path = filePath.FileName;
+            }
+            if (path == "")
+            {
+                path = "..\\..\\..\\SampleSTLs\\F-35_Corrected.gcode";
+            }
+            System.IO.StreamReader file = new System.IO.StreamReader(path);
 
             Stopwatch swTimer = new Stopwatch();
             swTimer.Start();
@@ -35,7 +50,7 @@ namespace PrinterSimulator
             Console.ReadKey();
         }
 
-        [STAThread]
+       
 
         [DllImport("kernel32.dll", SetLastError = true)]
         static extern IntPtr GetConsoleWindow();
@@ -45,6 +60,7 @@ namespace PrinterSimulator
 
         [DllImport("user32.dll", SetLastError = true)]
         static extern bool SetForegroundWindow(IntPtr hWnd);
+        [STAThread]
 
         static void Main()
         {
