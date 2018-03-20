@@ -1,0 +1,3 @@
+[submodule "gsGCode"]
+	path = gsGCode
+	url = https://github.com/gradientspace/gsGCode.git
