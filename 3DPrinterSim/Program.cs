@@ -14,6 +14,8 @@ using System.Diagnostics;
 using Hardware;
 using Firmware;
 using System.Windows.Forms;
+using gs;
+using System.IO;
 
 namespace PrinterSimulator
 {
@@ -35,12 +37,19 @@ namespace PrinterSimulator
             {
                 path = "..\\..\\..\\SampleSTLs\\F-35_Corrected.gcode";
             }
-            System.IO.StreamReader file = new System.IO.StreamReader(path);
+            StreamReader file = new System.IO.StreamReader(path);
 
             Stopwatch swTimer = new Stopwatch();
             swTimer.Start();
 
-            // Todo - Read GCODE file and send data to firmware for printing
+            // Parse the GCode file
+            var parser = new GenericGCodeParser();
+            var instructions = parser.Parse(file);
+
+            foreach(var line in instructions.AllLines())
+            {
+                Console.WriteLine(line.orig_string);
+            }
 
             swTimer.Stop();
             long elapsedMS = swTimer.ElapsedMilliseconds;
