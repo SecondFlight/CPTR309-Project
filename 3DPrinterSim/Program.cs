@@ -50,7 +50,36 @@ namespace PrinterSimulator
             Console.ReadKey();
         }
 
-       
+        private static void TesterMenu()
+        {
+            Console.WriteLine("3D Printer Simulation - Tester Menu\n");
+            Console.WriteLine("L - Test laser");
+            Console.WriteLine("G - Test galvanometer");
+            Console.WriteLine("Z - Test Z-Rail");
+            Console.WriteLine("S - Test limit switch");
+            Console.WriteLine("P - Test Printer");
+            Console.WriteLine("Q - Go back to Main Menu");
+
+            char ch = Char.ToUpper(Console.ReadKey().KeyChar);
+            switch (ch)
+            {
+                case 'L':
+                    break;
+                case 'G':
+                    break;
+                case 'Z':
+                    break;
+                case 'S':
+                    break;
+                case 'P':
+                    break;
+                case 'Q':
+                    break;
+            }
+
+        }
+
+
 
         [DllImport("kernel32.dll", SetLastError = true)]
         static extern IntPtr GetConsoleWindow();
@@ -99,6 +128,7 @@ namespace PrinterSimulator
                         break;
 
                     case 'T': // Test menu
+                        TesterMenu();
                         break;
 
                     case 'Q' :  // Quite
