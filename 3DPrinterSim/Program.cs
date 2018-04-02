@@ -14,6 +14,8 @@ using System.Diagnostics;
 using Hardware;
 using Firmware;
 using System.Windows.Forms;
+using gs;
+using System.IO;
 
 namespace PrinterSimulator
 {
@@ -35,12 +37,71 @@ namespace PrinterSimulator
             {
                 path = "..\\..\\..\\SampleSTLs\\F-35_Corrected.gcode";
             }
-            System.IO.StreamReader file = new System.IO.StreamReader(path);
+            StreamReader file = new System.IO.StreamReader(path);
 
             Stopwatch swTimer = new Stopwatch();
             swTimer.Start();
 
-            // Todo - Read GCODE file and send data to firmware for printing
+            // Parse the GCode file
+            var parser = new GenericGCodeParser();
+            var instructions = parser.Parse(file);
+
+            /*
+             * Commands to note:
+             * G28: Home all axes
+             * G28 X0: Home x axis
+             * 
+             * 
+             */
+
+            double currentX = 0;
+            double currentY = 0;
+            double currentZ = 0;
+            double currentSize = 0;
+
+            foreach (var line in instructions.AllLines())
+            {
+                if (line.parameters != null)
+                {
+                    //Console.WriteLine(line.code);
+                    if (line.code == 1)
+                    {
+                        foreach (var parameter in line.parameters)
+                        {
+                            if (parameter.identifier.ToUpper() == "X")
+                            {
+                                currentX = parameter.doubleValue;
+                            }
+
+                            if (parameter.identifier.ToUpper() == "Y")
+                            {
+                                currentY = parameter.doubleValue;
+                            }
+
+                            if (parameter.identifier.ToUpper() == "Z")
+                            {
+                                currentZ = parameter.doubleValue;
+                            }
+
+                            if (parameter.identifier.ToUpper() == "E")
+                            {
+                                currentSize = parameter.doubleValue;
+                            }
+
+                            // TODO: Send printer command (replace below with function call)
+                            Console.WriteLine("X: " + currentX.ToString() + ", Y: " + currentY.ToString() + ", Z: " + currentZ.ToString() + ", size: " + currentSize.ToString());
+                        }
+                    }
+                    /*
+                    foreach (var parameter in line.parameters)
+                    {
+                        if (parameter.identifier.ToUpper() == "E")
+                        {
+                            
+                        }
+                    }*/
+        }
+    }
 
             swTimer.Stop();
             long elapsedMS = swTimer.ElapsedMilliseconds;

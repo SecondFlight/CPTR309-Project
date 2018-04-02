@@ -7,6 +7,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "3DPrinterSim", "3DPrinterSi
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Firmware", "..\Firmware\Firmware.csproj", "{95380E0B-DF03-42BB-8967-A8C8ED0F1BB6}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "gsGCode", "..\gsGCode\gsGCode.csproj", "{25DE77C9-14A4-4562-9A24-0BF1E612D9A9}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "geometry3Sharp", "..\geometry3Sharp\geometry3Sharp.csproj", "{0C518DDA-28FE-44CA-9AB0-F9773974F13A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,8 +25,19 @@ Global
 		{95380E0B-DF03-42BB-8967-A8C8ED0F1BB6}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{95380E0B-DF03-42BB-8967-A8C8ED0F1BB6}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{95380E0B-DF03-42BB-8967-A8C8ED0F1BB6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{25DE77C9-14A4-4562-9A24-0BF1E612D9A9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{25DE77C9-14A4-4562-9A24-0BF1E612D9A9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{25DE77C9-14A4-4562-9A24-0BF1E612D9A9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{25DE77C9-14A4-4562-9A24-0BF1E612D9A9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0C518DDA-28FE-44CA-9AB0-F9773974F13A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0C518DDA-28FE-44CA-9AB0-F9773974F13A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0C518DDA-28FE-44CA-9AB0-F9773974F13A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0C518DDA-28FE-44CA-9AB0-F9773974F13A}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {113B0030-4224-4AD0-A93E-EFC94513B3C4}
 	EndGlobalSection
 EndGlobal
