@@ -46,10 +46,62 @@ namespace PrinterSimulator
             var parser = new GenericGCodeParser();
             var instructions = parser.Parse(file);
 
-            foreach(var line in instructions.AllLines())
+            /*
+             * Commands to note:
+             * G28: Home all axes
+             * G28 X0: Home x axis
+             * 
+             * 
+             */
+
+            double currentX = 0;
+            double currentY = 0;
+            double currentZ = 0;
+            double currentSize = 0;
+
+            foreach (var line in instructions.AllLines())
             {
-                Console.WriteLine(line.orig_string);
-            }
+                if (line.parameters != null)
+                {
+                    //Console.WriteLine(line.code);
+                    if (line.code == 1)
+                    {
+                        foreach (var parameter in line.parameters)
+                        {
+                            if (parameter.identifier.ToUpper() == "X")
+                            {
+                                currentX = parameter.doubleValue;
+                            }
+
+                            if (parameter.identifier.ToUpper() == "Y")
+                            {
+                                currentY = parameter.doubleValue;
+                            }
+
+                            if (parameter.identifier.ToUpper() == "Z")
+                            {
+                                currentZ = parameter.doubleValue;
+                            }
+
+                            if (parameter.identifier.ToUpper() == "E")
+                            {
+                                currentSize = parameter.doubleValue;
+                            }
+
+                            // TODO: Send printer command (replace below with function call)
+                            Console.WriteLine("X: " + currentX.ToString() + ", Y: " + currentY.ToString() + ", Z: " + currentZ.ToString() + ", size: " + currentSize.ToString());
+                        }
+                    }
+                    /*
+                    foreach (var parameter in line.parameters)
+                    {
+                        if (parameter.identifier.ToUpper() == "E")
+                        {
+                            
+                        }
+                    }*/
+        }
+    }
 
             swTimer.Stop();
             long elapsedMS = swTimer.ElapsedMilliseconds;
