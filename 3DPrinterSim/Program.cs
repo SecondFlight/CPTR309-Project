@@ -111,7 +111,61 @@ namespace PrinterSimulator
             Console.ReadKey();
         }
 
-       
+        byte[] Checksum(byte[] packet)
+        {
+            //Add up all the bytes in the entire command packet including command byte, length, etc. 
+            //When adding bytes, the checksum fields are initialized to zero.
+            //After the checksum for the command is calculated, the checksum bytes(2 & 3) are set with the calculated checksum.
+        }
+        static string HostToFirmware(byte[] packet)
+        {
+            //        Host-to-Firmware Communication Procedure
+            //    Send 4-byte header consisting of command byte, length, and 16-bit checksum
+
+            //    Read header bytes back from firmware to verify correct receipt of command header
+            //    If header is correct
+            //        Send ACK(0xA5) to firmware
+
+            //        Send rest of packet not including the 4-byte header
+
+            //        Wait for first byte of response to be received
+
+            //        Continue reading rest of response until null byte (0) is received
+            //        Verify that response string equals “SUCCESS” or “VERSION n.n” (If not, re-send entire command)
+            //	else if header is not received correctly
+            //        Send NAK(0xFF)
+
+            //        Retry command
+        }
+
+
+
+
+        //Firmware-to-Host Communication Procedure
+
+        //    Read 4-byte header from host
+
+        //    Write 4-byte header back to host
+        //    Read ACK/NAK byte
+        //    If ACK received
+
+        //        Attempt to read number of parameter bytes indicated in command header
+
+        //        If insufficient bytes are received
+        //return “TIMEOUT”
+        //		Else
+        //            Validate checksum(Be sure NOT to include checksum values themselves)
+
+        //            If checksum correct
+        //                Process command
+        //                Return “SUCCESS” or “VERSION n.n”
+        //			Else
+        //                Return “CHECKSUM”
+
+        //    Else if NAK received
+
+        //        Ignore command – it will be resent
+
 
         [DllImport("kernel32.dll", SetLastError = true)]
         static extern IntPtr GetConsoleWindow();

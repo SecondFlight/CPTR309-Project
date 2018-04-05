@@ -46,5 +46,33 @@ namespace Firmware
             while (!fInitialized)
                 Thread.Sleep(100);
         }
+
+        static string HostToFirmware(byte[] packet)
+        {
+            //Firmware-to-Host Communication Procedure
+
+            //    Read 4-byte header from host
+
+            //    Write 4-byte header back to host
+            //    Read ACK/NAK byte
+            //    If ACK received
+
+            //        Attempt to read number of parameter bytes indicated in command header
+
+            //        If insufficient bytes are received
+            //return “TIMEOUT”
+            //		Else
+            //            Validate checksum(Be sure NOT to include checksum values themselves)
+
+            //            If checksum correct
+            //                Process command
+            //                Return “SUCCESS” or “VERSION n.n”
+            //			Else
+            //                Return “CHECKSUM”
+
+            //    Else if NAK received
+
+            //        Ignore command – it will be resent
+        }
     }
 }
