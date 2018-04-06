@@ -46,5 +46,7 @@ namespace Firmware
             while (!fInitialized)
                 Thread.Sleep(100);
         }
+
+        
     }
 }
