@@ -131,7 +131,7 @@ namespace PrinterSimulator
 
             return return_packet;
         }
-        static string HostToFirmware(byte[] packet, PrinterControl simCtl) 
+        static string HostToFirmware(byte[] packet, PrinterControl simCtl) // MAKE COPIES OF ALL THE THINGS
         {
             //        Host-to-Firmware Communication Procedure
             int header_size = 4;    // 4 is header size
@@ -142,21 +142,21 @@ namespace PrinterSimulator
 
             //      Send 4-byte header consisting of command byte, length, and 16-bit checksum
             byte[] checksummed_packet = Checksum(packet);
-            byte[] header = { 0x00 };   // array substring
+            byte[] header = checksummed_packet.Skip(0).Take(header_size).ToArray();   // array substring from Skip and Take, 0 to 4
             int header_bytes_sent = simCtl.WriteSerialToFirmware(header, header_size);
 
             //      Read header bytes back from firmware to verify correct receipt of command header
-            byte[] possible_header = { 0x00};
+            byte[] possible_header = { 0x00 };
             int header_bytes_recieved = simCtl.ReadSerialFromFirmware(possible_header, header_size); 
             
             //      If header is correct
-            if (header == possible_header)
+            if (header == possible_header)  // SequenceEqualOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
             {
                 //        Send ACK(0xA5) to firmware
                 int ACK_send = simCtl.WriteSerialToFirmware(ACK, ACK_NAK_size);    // 1 is the size of the ACK and NAK bytes
 
                 //        Send rest of packet not including the 4-byte header
-                byte[] rest_bytes_send = { 0x00 };  // array substring
+                byte[] rest_bytes_send = checksummed_packet.Skip(header_size).Take(checksummed_packet.Length - header_size).ToArray();  // array substring
                 int rest_bytes_sent = simCtl.WriteSerialToFirmware(rest_bytes_send, packet.Length - header_size);
 
                 //        Wait for first byte of response to be received
@@ -189,8 +189,8 @@ namespace PrinterSimulator
                 else
                 {
                     //      retry command
-                    HostToFirmware(packet, simCtl);
-                    return "RETRY";
+                    //HostToFirmware(packet, simCtl);
+                    return HostToFirmware(packet, simCtl);
                 }
             }
             //      else if header is not received correctly
@@ -200,8 +200,8 @@ namespace PrinterSimulator
                 int NAK_send = simCtl.WriteSerialToFirmware(NAK, ACK_NAK_size);
 
                 //      Retry command
-                HostToFirmware(packet, simCtl);
-                return "NAK";
+                //HostToFirmware(packet, simCtl);
+                return HostToFirmware(packet, simCtl);
             }
         }
 
@@ -256,7 +256,7 @@ namespace PrinterSimulator
                     var header_checksum_bytes = header_recieved.Skip(2).Take(2).ToArray();
 
                     //      If checksum correct
-                    if (combined_checksum_bytes == header_checksum_bytes)
+                    if (combined_checksum_bytes.SequenceEqual(header_checksum_bytes))    // .SequenceEqual checks the actual value
                     {
 
                         //      Process command     // TYLER
