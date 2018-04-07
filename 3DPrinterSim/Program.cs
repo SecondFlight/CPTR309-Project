@@ -14,7 +14,7 @@ using System.Diagnostics;
 using Hardware;
 using Firmware;
 using System.Windows.Forms;
-using gs;
+using gs;   // what is this for?
 using System.IO;
 
 namespace PrinterSimulator
@@ -137,29 +137,32 @@ namespace PrinterSimulator
             int header_size = 4;    // 4 is header size
             int response_size = 0;  // UNSURE OF SIZE OF RESPONSE
             int ACK_NAK_size = 1;   // size of both ACK and NAK bytes
+            byte null_byte = 0x30;
             byte[] ACK = { 0xA5 };  // ACK byte 
             byte[] NAK = { 0xFF };  // ACK byte
+            string success = "SUCCESS";
 
             //      Send 4-byte header consisting of command byte, length, and 16-bit checksum
             byte[] checksummed_packet = Checksum(packet);
             byte[] header = checksummed_packet.Skip(0).Take(header_size).ToArray();   // array substring from Skip and Take, 0 to 4
-            int header_bytes_sent = simCtl.WriteSerialToFirmware(header, header_size);
+            var header_copy = header;   // making a copy for header to go in
+            int header_bytes_sent = simCtl.WriteSerialToFirmware(header_copy, header_size);
 
             //      Read header bytes back from firmware to verify correct receipt of command header
             byte[] possible_header = { 0x00 };
             int header_bytes_recieved = simCtl.ReadSerialFromFirmware(possible_header, header_size); 
             
             //      If header is correct
-            if (header == possible_header)  // SequenceEqualOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
+            if (header.SequenceEqual(possible_header))  // header == possible_header
             {
-                //        Send ACK(0xA5) to firmware
+                //      Send ACK(0xA5) to firmware
                 int ACK_send = simCtl.WriteSerialToFirmware(ACK, ACK_NAK_size);    // 1 is the size of the ACK and NAK bytes
 
-                //        Send rest of packet not including the 4-byte header
+                //      Send rest of packet not including the 4-byte header
                 byte[] rest_bytes_send = checksummed_packet.Skip(header_size).Take(checksummed_packet.Length - header_size).ToArray();  // array substring
                 int rest_bytes_sent = simCtl.WriteSerialToFirmware(rest_bytes_send, packet.Length - header_size);
 
-                //        Wait for first byte of response to be received
+                //      Wait for first byte of response to be received
                 byte[] response_bytes = { 0x00 };
                 int response_bytes_recieved = simCtl.ReadSerialFromFirmware(response_bytes, response_size);
                 
@@ -168,29 +171,26 @@ namespace PrinterSimulator
                     ;   // wait
                 }
 
-                //        Continue reading rest of response until null byte (0) is received
-                byte null_byte = 0x30;
-
+                //      Continue reading rest of response until null byte (0) is received
                 while (true)
                 {
-                    if (response_bytes[response_bytes.Length - 1] == null_byte)
+                    if (response_bytes[response_bytes.Length - 1] == null_byte) // should I use .SequenceEqual()?
                     {
-                        break;
+                        break;  // exit the wait loop
                     }
                 }
 
                 string response_string = System.Text.Encoding.ASCII.GetString(response_bytes);
 
-                //        Verify that response string equals “SUCCESS” or “VERSION n.n” (If not, re-send entire command)
-                if (response_string == "SUCCESS")    //  || response_bytes == "VERSION n.n"
+                //      Verify that response string equals “SUCCESS” or “VERSION n.n” (If not, re-send entire command)
+                if (response_string == success)    //  || response_bytes == "VERSION n.n"
                 {
-                    return "SUCCESS";
+                    return success;
                 }
                 else
                 {
                     //      retry command
-                    //HostToFirmware(packet, simCtl);
-                    return HostToFirmware(packet, simCtl);
+                    return HostToFirmware(packet, simCtl);  // this retries the command and returns the result of that command
                 }
             }
             //      else if header is not received correctly
@@ -200,14 +200,11 @@ namespace PrinterSimulator
                 int NAK_send = simCtl.WriteSerialToFirmware(NAK, ACK_NAK_size);
 
                 //      Retry command
-                //HostToFirmware(packet, simCtl);
-                return HostToFirmware(packet, simCtl);
+                return HostToFirmware(packet, simCtl);  // this retries the command and returns the result of that command
             }
         }
 
         //  This function will be later moved to Firmware.cs as it is Firmware to Host side of things
-        
-        
         static string FirmwareToHost(byte[] packet, PrinterControl printer)
         {
             //Firmware-to-Host Communication Procedure
@@ -216,6 +213,10 @@ namespace PrinterSimulator
             int ACK_NAK_size = 1;   // size of both ACK and NAK bytes
             byte[] ACK = { 0xA5 };  // ACK byte 
             byte[] NAK = { 0xFF };  // ACK byte
+            string timeout = "TIMEOUT";
+            string success = "SUCCESS";
+            string checksum = "CHECKSUM";
+            string nak = "NAK";
 
             //      Read 4-byte header from host
             byte[] header_recieved = { 0x00 };
@@ -228,21 +229,22 @@ namespace PrinterSimulator
             //      Read ACK/NAK byte
             byte[] ACK_NAK = { 0x00 };
             int ACK_NAK_recived = printer.ReadSerialFromHost(ACK_NAK, ACK_NAK_size);
+
             //      If ACK received
             if (ACK_NAK == ACK)
             {
-                //        Attempt to read number of parameter bytes indicated in command header
-                int num_bytes_rest = (int)(header_recieved[1]); // header_recieved[1] is the number of the rest of the packet
+                //      Attempt to read number of parameter bytes indicated in command header
                 byte[] rest_bytes = { 0x00 };
-
+                int num_bytes_rest = (int)(header_recieved[1]); // header_recieved[1] is the number of bytes in the rest of the packet
                 int rest_bytes_recieved = printer.ReadSerialFromHost(rest_bytes, num_bytes_rest); 
+
                 //      If insufficient bytes are received
-                if (rest_bytes_recieved < num_bytes_rest)
+                if (rest_bytes_recieved < num_bytes_rest)   // if number of bytes recieved is less than number of bytes sent
                 {
                     //      return “TIMEOUT”
-                    byte[] response_bytes = ResponseMaker("TIMEOUT");
+                    byte[] response_bytes = ResponseMaker(timeout);
                     int response_bytes_sent = printer.WriteSerialToHost(response_bytes, response_size);
-                    return "TIMEOUT";
+                    return timeout;
                 }
                 else
                 {
@@ -259,20 +261,20 @@ namespace PrinterSimulator
                     if (combined_checksum_bytes.SequenceEqual(header_checksum_bytes))    // .SequenceEqual checks the actual value
                     {
 
-                        //      Process command     // TYLER
+                        //      Process command     // TYLER's Section
 
                         //      Return “SUCCESS” or “VERSION n.n”
-                        byte[] response_bytes = ResponseMaker("SUCCESS");
+                        byte[] response_bytes = ResponseMaker(success);
                         int response_bytes_sent = printer.WriteSerialToHost(response_bytes, response_size);
-                        return "SUCCESS";
+                        return success;
                     }
                     //      Else
                     else
                     {
                         //      Return “CHECKSUM”
-                        byte[] response_bytes = ResponseMaker("CHECKSUM");
+                        byte[] response_bytes = ResponseMaker(checksum);
                         int response_bytes_sent = printer.WriteSerialToHost(response_bytes, response_size);
-                        return "CHECKSUM";
+                        return checksum;
                     }
                 }
             }
@@ -280,11 +282,11 @@ namespace PrinterSimulator
             else if (ACK_NAK == NAK)
             {
                 //      Ignore command – it will be resent
-                return "NAK";
+                return nak;
             }
             else
             {
-                return "Unknown byte";
+                return "Unknown byte";  // should never get to this 
             }
         }
 
