@@ -162,14 +162,39 @@ namespace Firmware
 
         static void ProcessCommand(byte[] packet)
         {
-            //      Process      // TYLER's Section, will add the commands here and return proper values. 
-            if (true)   // command = set laser
-            {
-                PrinterControl.SetLaser(true);
-            }
-            else if (command == movegalvos)
-            {
+            //      Process      // TYLER's Section, Recives byte array . 
+            /*  Byte 0:	  Command byte
+	            Byte 1:   Length of parameter data (# of bytes)
+	            Byte 2:	  Low-byte of 16-bit checksum
+	            Byte 3:   High-byte of 16-bit checksum
+	            Byte 4-n: Parameter data wait ms, stepper, move galvos, remove model, set laser
+            
+             Note: what we need to know is which bytes corespond to controling which of the below commands.
+             */
 
+            if (byte[?]     == WaitMicrosecondscommand) //WaitMicroseconds
+            {
+                return WaitMicroseconds(byte[?]);
+            }
+
+            else if (byte[?] == ResetSteppercommand)    //ResetStepper
+            {
+                return ResetStepper(?);
+            }
+
+            else if (command == MoveGalvoscommand)      //MoveGalvos
+            {
+                return MoveGalvos(?);
+            }
+
+            else if (command == RemoveModelFromPrintercommand) //RemoveModelFromPrinter
+            {
+                return RemoveModelFromPrinter(?);
+            }
+
+            else if (command == SetLasercommand) //SetLaser
+            {
+                return SetLaser(?);
             }
         }
     }
