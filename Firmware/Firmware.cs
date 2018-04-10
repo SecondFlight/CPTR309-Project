@@ -162,7 +162,7 @@ namespace Firmware
 
         static void ProcessCommand(byte[] packet)
         {
-            //      Process      // TYLER's Section
+            //      Process      // TYLER's Section, will add the commands here and return proper values. 
             if (true)   // command = set laser
             {
                 PrinterControl.SetLaser(true);
