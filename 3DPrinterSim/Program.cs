@@ -57,7 +57,7 @@ namespace PrinterSimulator
             double currentX = 0;
             double currentY = 0;
             double currentZ = 0;
-            double currentSize = 0;
+            bool isLaserOn = false;
 
             foreach (var line in instructions.AllLines())
             {
@@ -68,28 +68,50 @@ namespace PrinterSimulator
                     {
                         foreach (var parameter in line.parameters)
                         {
+                            bool containsX = false;
+                            bool containsY = false;
+                            bool containsZ = false;
+                            bool containsE = false;
                             if (parameter.identifier.ToUpper() == "X")
                             {
                                 currentX = parameter.doubleValue;
+                                containsX = true;
                             }
 
                             if (parameter.identifier.ToUpper() == "Y")
                             {
                                 currentY = parameter.doubleValue;
+                                containsY = true;
                             }
 
                             if (parameter.identifier.ToUpper() == "Z")
                             {
                                 currentZ = parameter.doubleValue;
+                                containsZ = true;
                             }
 
                             if (parameter.identifier.ToUpper() == "E")
                             {
-                                currentSize = parameter.doubleValue;
+                                isLaserOn = parameter.doubleValue > 0;
+                                containsE = true;
                             }
 
-                            // TODO: Send printer command (replace below with function call)
-                            Console.WriteLine("X: " + currentX.ToString() + ", Y: " + currentY.ToString() + ", Z: " + currentZ.ToString() + ", size: " + currentSize.ToString());
+                            if (containsX && containsY)
+                            {
+
+                            }
+                            else if (containsZ)
+                            {
+
+                            }
+                            else if (isLaserOn)
+                            {
+
+                            }
+                            else if (containsX || containsY)
+                            {
+                                throw new InvalidDataException("Invalid GCode command - command contains one X/Y command without the other.");
+                            }
                         }
                     }
                     /*
