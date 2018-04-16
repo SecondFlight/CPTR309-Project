@@ -8,9 +8,10 @@
     <OutputType>Exe</OutputType>
     <RootNamespace>_3DPrinterSim</RootNamespace>
     <AssemblyName>3DPrinterSim</AssemblyName>
-    <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <TargetFrameworkProfile />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <PlatformTarget>AnyCPU</PlatformTarget>
@@ -64,6 +65,14 @@
     <ProjectReference Include="..\Firmware\Firmware.csproj">
       <Project>{95380e0b-df03-42bb-8967-a8c8ed0f1bb6}</Project>
       <Name>Firmware</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\geometry3Sharp\geometry3Sharp.csproj">
+      <Project>{0c518dda-28fe-44ca-9ab0-f9773974f13a}</Project>
+      <Name>geometry3Sharp</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\gsGCode\gsGCode.csproj">
+      <Project>{25de77c9-14a4-4562-9a24-0bf1e612d9a9}</Project>
+      <Name>gsGCode</Name>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
