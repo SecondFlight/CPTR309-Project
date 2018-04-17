@@ -184,8 +184,22 @@ namespace PrinterSimulator
 
             return return_packet;
         }
-        static string HostToFirmware(byte[] packet, PrinterControl simCtl) // MAKE COPIES OF ALL THE THINGS
+
+        /*
+         * HostToFirmware
+         * 
+         * Returns: true on success, false on failure
+         * Arguments:
+         *   packet: Packet to be sent
+         *   simCtl: PrinterControl variable that gets passed around to everything
+         *   (optional) maxRetries: Maximum number of retries before faliure is returned
+         *   (internal) currentRetry: Used internally to track the current retry count
+         */
+        static bool HostToFirmware(byte[] packet, PrinterControl simCtl, int maxRetries = 100, int currentRetry = 0) // MAKE COPIES OF ALL THE THINGS
         {
+            if (currentRetry >= maxRetries)
+                return false;
+
             //        Host-to-Firmware Communication Procedure
             int header_size = 4;    // 4 is header size
             int response_size = 0;  // UNSURE OF SIZE OF RESPONSE
@@ -238,12 +252,12 @@ namespace PrinterSimulator
                 //      Verify that response string equals “SUCCESS” or “VERSION n.n” (If not, re-send entire command)
                 if (response_string == success)    //  || response_bytes == "VERSION n.n"
                 {
-                    return success;
+                    return true;
                 }
                 else
                 {
                     //      retry command
-                    return HostToFirmware(packet, simCtl);  // this retries the command and returns the result of that command
+                    return HostToFirmware(packet, simCtl, maxRetries, currentRetry + 1);  // this retries the command and returns the result of that command
                 }
             }
             //      else if header is not received correctly
@@ -253,7 +267,7 @@ namespace PrinterSimulator
                 int NAK_send = simCtl.WriteSerialToFirmware(NAK, ACK_NAK_size);
 
                 //      Retry command
-                return HostToFirmware(packet, simCtl);  // this retries the command and returns the result of that command
+                return HostToFirmware(packet, simCtl, maxRetries, currentRetry + 1);  // this retries the command and returns the result of that command
             }
         }
 
