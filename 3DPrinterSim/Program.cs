@@ -232,7 +232,7 @@ namespace PrinterSimulator
          *   (optional) maxRetries: Maximum number of retries before faliure is returned
          *   (internal) currentRetry: Used internally to track the current retry count
          */
-        static bool HostToFirmware(byte[] packet, PrinterControl simCtl, int maxRetries = 100, int currentRetry = 0) // MAKE COPIES OF ALL THE THINGS
+        static bool HostToFirmware(byte[] packet, PrinterControl simCtl, int maxRetries = 10, int currentRetry = 0) // MAKE COPIES OF ALL THE THINGS
         {
             if (currentRetry >= maxRetries)
                 return false;
@@ -249,14 +249,18 @@ namespace PrinterSimulator
             //      Send 4-byte header consisting of command byte, length, and 16-bit checksum
             byte[] checksummed_packet = Checksum(packet);
             byte[] header = checksummed_packet.Skip(0).Take(header_size).ToArray();   // array substring from Skip and Take, 0 to 4
-            var header_copy = header;   // making a copy for header to go in
+            var header_copy = header;   // making a copy for header to go in so it doesn't change it
             int header_bytes_sent = simCtl.WriteSerialToFirmware(header_copy, header_size);
 
             //      Read header bytes back from firmware to verify correct receipt of command header
-            byte[] possible_header = { 0x00 };
-            int header_bytes_recieved = simCtl.ReadSerialFromFirmware(possible_header, header_size); 
+            byte[] possible_header = new byte[header_size];
+            int header_bytes_recieved = simCtl.ReadSerialFromFirmware(possible_header, header_size);
+            while(header_bytes_recieved < header_size) // wait for four bytes to be recieved // 4 bytes
+            {
+                ;  // wait
+            }
             
-            //      If header is correct
+                                                           //      If header is correct
             if (header.SequenceEqual(possible_header))  // header == possible_header
             {
                 //      Send ACK(0xA5) to firmware
@@ -267,7 +271,7 @@ namespace PrinterSimulator
                 int rest_bytes_sent = simCtl.WriteSerialToFirmware(rest_bytes_send, packet.Length - header_size);
 
                 //      Wait for first byte of response to be received
-                byte[] response_bytes = { 0x00 };
+                byte[] response_bytes = new byte[response_size];
                 int response_bytes_recieved = simCtl.ReadSerialFromFirmware(response_bytes, response_size);
                 
                 while (response_bytes_recieved < 1)

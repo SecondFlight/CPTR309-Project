@@ -24,9 +24,10 @@ namespace Firmware
         void Process()
         {
             // Todo - receive incoming commands from the serial link and act on those commands by calling the low-level hardwarwe APIs, etc.
-            while (!fDone)
-            {
-            }
+            //while (!fDone)
+            //{
+            //}
+            FirmwareToHost(printer);
         }
 
         public void Start()
@@ -68,7 +69,7 @@ namespace Firmware
             return return_packet;
         }
 
-        static string FirmwareToHost(byte[] packet, PrinterControl printer)
+        static string FirmwareToHost(PrinterControl printer) // took out byte[] packet, // need to change the return type to the same as the host side
         {
             //Firmware-to-Host Communication Procedure
             int header_size = 4;    // 4 is header size
@@ -83,8 +84,12 @@ namespace Firmware
 
             //      Read 4-byte header from host
             byte[] header_recieved = { 0x00 };
-            int header_bytes_recieved = printer.ReadSerialFromHost(header_recieved, header_size);
-
+            //int header_bytes_recieved = printer.ReadSerialFromHost(header_recieved, header_size);
+            // wait for bytes to be recieved
+            while(printer.ReadSerialFromHost(header_recieved, header_size) < header_size)      // the function returns header_bytes_recieved
+            {
+                ; // wait
+            }
             //      Write 4-byte header back to host
             byte[] header_sent = header_recieved;
             int header_bytes_sent = printer.WriteSerialToHost(header_sent, header_size);
@@ -97,10 +102,13 @@ namespace Firmware
             if (ACK_NAK == ACK)
             {
                 //      Attempt to read number of parameter bytes indicated in command header
-                byte[] rest_bytes = { 0x00 };
                 int num_bytes_rest = (int)(header_recieved[1]); // header_recieved[1] is the number of bytes in the rest of the packet
+                byte[] rest_bytes = new byte[num_bytes_rest];
                 int rest_bytes_recieved = printer.ReadSerialFromHost(rest_bytes, num_bytes_rest);
-
+                //while (true)    // FIX THIS!!!!
+                //{
+                //    ;
+                //}
                 //      If insufficient bytes are received
                 if (rest_bytes_recieved < num_bytes_rest)   // if number of bytes recieved is less than number of bytes sent
                 {
@@ -123,9 +131,9 @@ namespace Firmware
                     //      If checksum correct
                     if (combined_checksum_bytes.SequenceEqual(header_checksum_bytes))    // .SequenceEqual checks the actual value
                     {
-
+                        // Combined should be the packet without the checksum. make sure
                         //      Process      // TYLER's Section
-                        ProcessCommand(packet);     // change from packet to actual packet that goes into the function
+                        ProcessCommand(combined);     // change from packet to actual packet that goes into the function // how can this work without returning????
 
                         //      Return “SUCCESS” or “VERSION n.n”
                         byte[] response_bytes = ResponseMaker(success);
@@ -162,15 +170,15 @@ namespace Firmware
 
         static void ProcessCommand(byte[] packet)
         {
-            //      Process      // TYLER's Section
-            if (true)   // command = set laser
-            {
-                PrinterControl.SetLaser(true);
-            }
-            else if (command == movegalvos)
-            {
+            ////      Process      // TYLER's Section
+            //if (true)   // command = set laser
+            //{
+            //    PrinterControl.SetLaser(true);
+            //}
+            //else if (command == movegalvos)
+            //{
 
-            }
+            //}
         }
     }
 }
