@@ -96,21 +96,52 @@ namespace PrinterSimulator
                                 containsE = true;
                             }
 
+                            // Command number: 0x00
+                            // Format: X (4 bytes), Y (4 bytes)
                             if (containsX && containsY)
                             {
+                                var bytesToSend = new byte[12];
+                                bytesToSend[0] = 0x00; // Command number
+                                bytesToSend[1] = 0x08; // Data length
+                                bytesToSend[2] = 0x00; // Blank (for checksum)
+                                bytesToSend[3] = 0x00; // Blank (for checksum)
 
+                                // Convert x position and y position to a byte array
+                                var xBytes = BitConverter.GetBytes((float)currentX);
+                                var yBytes = BitConverter.GetBytes((float)currentY);
+
+                                // Insert x position
+                                for (int i = 0; i < xBytes.Length; i++)
+                                {
+                                    bytesToSend[i + 4] = xBytes[i];
+                                }
+
+                                // Insert y position
+                                for (int i = 0; i < yBytes.Length; i++)
+                                {
+                                    bytesToSend[i + 8] = yBytes[i];
+                                }
+
+                                HostToFirmware(bytesToSend, simCtl); // Send data
                             }
+
+                            // Command number: 0x01
+                            // Format: Z (4 bytes)
                             else if (containsZ)
-                            {
-
-                            }
-                            else if (isLaserOn)
                             {
 
                             }
                             else if (containsX || containsY)
                             {
                                 throw new InvalidDataException("Invalid GCode command - command contains one X/Y command without the other.");
+                            }
+
+                            // Separately, if it contains an E
+                            // Command number: 0x02
+                            // Format: isLaserOn (1 byte)
+                            if (containsE)
+                            {
+
                             }
                         }
                     }
