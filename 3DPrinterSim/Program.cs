@@ -23,7 +23,7 @@ namespace PrinterSimulator
     {
         static void PrintFile(PrinterControl simCtl)
         {
-            Console.Clear();
+            //Console.Clear();
             Console.WriteLine("\nDefault file will be used unless alternate file is given");
             Console.WriteLine("Press any key to continue");
             Console.ReadKey();
@@ -66,12 +66,12 @@ namespace PrinterSimulator
                     //Console.WriteLine(line.code);
                     if (line.code == 1)
                     {
+                        bool containsX = false;
+                        bool containsY = false;
+                        bool containsZ = false;
+                        bool containsE = false;
                         foreach (var parameter in line.parameters)
                         {
-                            bool containsX = false;
-                            bool containsY = false;
-                            bool containsZ = false;
-                            bool containsE = false;
                             if (parameter.identifier.ToUpper() == "X")
                             {
                                 currentX = parameter.doubleValue;
@@ -95,66 +95,103 @@ namespace PrinterSimulator
                                 isLaserOn = parameter.doubleValue > 0;
                                 containsE = true;
                             }
+                        }
 
-                            // Command number: 0x00
-                            // Format: X (4 bytes), Y (4 bytes)
-                            if (containsX && containsY)
+                        // Command number: 0x00
+                        // Format: X (4 bytes), Y (4 bytes)
+                        if (containsX && containsY)
+                        {
+                            var bytesToSend = new byte[12];
+                            bytesToSend[0] = 0x00; // Command number
+                            bytesToSend[1] = 0x08; // Data length
+                            bytesToSend[2] = 0x00; // Blank (for checksum)
+                            bytesToSend[3] = 0x00; // Blank (for checksum)
+
+                            // Convert x position and y position to a byte array
+                            var xBytes = BitConverter.GetBytes((float)currentX);
+                            var yBytes = BitConverter.GetBytes((float)currentY);
+
+                            // Insert x position
+                            for (int i = 0; i < xBytes.Length; i++)
                             {
-                                var bytesToSend = new byte[12];
-                                bytesToSend[0] = 0x00; // Command number
-                                bytesToSend[1] = 0x08; // Data length
-                                bytesToSend[2] = 0x00; // Blank (for checksum)
-                                bytesToSend[3] = 0x00; // Blank (for checksum)
-
-                                // Convert x position and y position to a byte array
-                                var xBytes = BitConverter.GetBytes((float)currentX);
-                                var yBytes = BitConverter.GetBytes((float)currentY);
-
-                                // Insert x position
-                                for (int i = 0; i < xBytes.Length; i++)
-                                {
-                                    bytesToSend[i + 4] = xBytes[i];
-                                }
-
-                                // Insert y position
-                                for (int i = 0; i < yBytes.Length; i++)
-                                {
-                                    bytesToSend[i + 8] = yBytes[i];
-                                }
-
-                                HostToFirmware(bytesToSend, simCtl); // Send data
+                                bytesToSend[i + 4] = xBytes[i];
                             }
 
-                            // Command number: 0x01
-                            // Format: Z (4 bytes)
-                            else if (containsZ)
+                            // Insert y position
+                            for (int i = 0; i < yBytes.Length; i++)
                             {
-
-                            }
-                            else if (containsX || containsY)
-                            {
-                                throw new InvalidDataException("Invalid GCode command - command contains one X/Y command without the other.");
+                                bytesToSend[i + 8] = yBytes[i];
                             }
 
-                            // Separately, if it contains an E
-                            // Command number: 0x02
-                            // Format: isLaserOn (1 byte)
-                            if (containsE)
+                            // Send data
+                            if (!HostToFirmware(bytesToSend, simCtl))
                             {
+                                Console.WriteLine("Print failed - command failed to send.");
+                                return;
+                            }
+                        }
 
+                        // Command number: 0x01
+                        // Format: Z (4 bytes)
+                        else if (containsZ)
+                        {
+                            var bytesToSend = new byte[8];
+                            bytesToSend[0] = 0x01; // Command number
+                            bytesToSend[1] = 0x04; // Data length
+                            bytesToSend[2] = 0x00; // Blank (for checksum)
+                            bytesToSend[3] = 0x00; // Blank (for checksum)
+
+                            // Convert z position to a byte array
+                            var zBytes = BitConverter.GetBytes((float)currentZ);
+
+                            // Insert z position
+                            for (int i = 0; i < zBytes.Length; i++)
+                            {
+                                bytesToSend[i + 4] = zBytes[i];
+                            }
+
+                            // Send data
+                            if (!HostToFirmware(bytesToSend, simCtl))
+                            {
+                                Console.WriteLine("Print failed - command failed to send.");
+                                return;
+                            }
+                        }
+                        else if (containsX || containsY)
+                        {
+                            throw new InvalidDataException("Invalid GCode command - command contains one X/Y command without the other.");
+                        }
+
+                        // Separately, if it contains an E
+                        // Command number: 0x02
+                        // Format: isLaserOn (1 byte)
+                        if (containsE)
+                        {
+                            var bytesToSend = new byte[8];
+                            bytesToSend[0] = 0x02; // Command number
+                            bytesToSend[1] = 0x01; // Data length
+                            bytesToSend[2] = 0x00; // Blank (for checksum)
+                            bytesToSend[3] = 0x00; // Blank (for checksum)
+
+                            // Convert z position to a byte array
+                            var isLaserOnBytes = BitConverter.GetBytes(isLaserOn);
+
+                            // Insert isLaserOn
+                            for (int i = 0; i < isLaserOnBytes.Length; i++)
+                            {
+                                bytesToSend[i + 4] = isLaserOnBytes[i];
+                            }
+
+                            // Send data
+                            if (!HostToFirmware(bytesToSend, simCtl))
+                            {
+                                Console.WriteLine("Print failed - command failed to send.");
+                                return;
                             }
                         }
                     }
-                    /*
-                    foreach (var parameter in line.parameters)
-                    {
-                        if (parameter.identifier.ToUpper() == "E")
-                        {
-                            
-                        }
-                    }*/
-        }
-    }
+                }
+            }
 
             swTimer.Stop();
             long elapsedMS = swTimer.ElapsedMilliseconds;
@@ -317,7 +354,7 @@ namespace PrinterSimulator
             bool fDone = false;
             while (!fDone)
             {
-                Console.Clear();
+                //Console.Clear();
                 Console.WriteLine("3D Printer Simulation - Control Menu\n");
                 Console.WriteLine("P - Print");
                 Console.WriteLine("T - Test");
