@@ -137,7 +137,7 @@ namespace PrinterSimulator
                         {
                             var bytesToSend = new byte[8];
                             bytesToSend[0] = 0x01; // Command number
-                            bytesToSend[1] = 0x04; // Data length
+                            bytesToSend[1] = 0x04; // Data length   // changed from 04
                             bytesToSend[2] = 0x00; // Blank (for checksum)
                             bytesToSend[3] = 0x00; // Blank (for checksum)
 
@@ -254,12 +254,12 @@ namespace PrinterSimulator
 
             //      Read header bytes back from firmware to verify correct receipt of command header
             byte[] possible_header = new byte[header_size];
-            int header_bytes_recieved = simCtl.ReadSerialFromFirmware(possible_header, header_size);
-            while(header_bytes_recieved < header_size) // wait for four bytes to be recieved // 4 bytes
+            // int header_bytes_recieved = simCtl.ReadSerialFromFirmware(possible_header, header_size);
+            while(simCtl.ReadSerialFromFirmware(possible_header, header_size) < header_size)    // function inside returns header_bytes_recieved
             {
-                ;  // wait
+                ;  // wait for four bytes to be recieved // 4 bytes
             }
-            
+            int test = 0;
                                                            //      If header is correct
             if (header.SequenceEqual(possible_header))  // header == possible_header
             {
@@ -272,9 +272,9 @@ namespace PrinterSimulator
 
                 //      Wait for first byte of response to be received
                 byte[] response_bytes = new byte[response_size];
-                int response_bytes_recieved = simCtl.ReadSerialFromFirmware(response_bytes, response_size);
+                //int response_bytes_recieved = simCtl.ReadSerialFromFirmware(response_bytes, response_size);
                 
-                while (response_bytes_recieved < 1)
+                while (simCtl.ReadSerialFromFirmware(response_bytes, response_size) < 1 )   // function returns response_bytes_received
                 {
                     ;   // wait
                 }

@@ -64,7 +64,7 @@ namespace Firmware
 
             //      After the checksum for the command is calculated, the checksum bytes(2 & 3) are set with the calculated checksum.
             return_packet[2] = (byte)checksum;
-            return_packet[3] = (byte)(checksum >> 8);
+            return_packet[3] = (byte)(checksum << 8);
 
             return return_packet;
         }
@@ -83,7 +83,7 @@ namespace Firmware
             string nak = "NAK";
 
             //      Read 4-byte header from host
-            byte[] header_recieved = { 0x00 };
+            byte[] header_recieved = new byte[header_size];
             //int header_bytes_recieved = printer.ReadSerialFromHost(header_recieved, header_size);
             // wait for bytes to be recieved
             while(printer.ReadSerialFromHost(header_recieved, header_size) < header_size)      // the function returns header_bytes_recieved
@@ -95,22 +95,33 @@ namespace Firmware
             int header_bytes_sent = printer.WriteSerialToHost(header_sent, header_size);
 
             //      Read ACK/NAK byte
-            byte[] ACK_NAK = { 0x00 };
-            int ACK_NAK_recived = printer.ReadSerialFromHost(ACK_NAK, ACK_NAK_size);
-
+            byte[] ACK_NAK = { 0x00 };  // change this to a one element array with nothing in it
+            //int ACK_NAK_recived = printer.ReadSerialFromHost(ACK_NAK, ACK_NAK_size);
+            while(printer.ReadSerialFromHost(ACK_NAK, ACK_NAK_size) < 1)    // function inside returns ACK_NAK_recieved (int)
+            {
+                ; // wait
+            }
             //      If ACK received
-            if (ACK_NAK == ACK)
+            if (ACK_NAK.SequenceEqual(ACK))
             {
                 //      Attempt to read number of parameter bytes indicated in command header
                 int num_bytes_rest = (int)(header_recieved[1]); // header_recieved[1] is the number of bytes in the rest of the packet
                 byte[] rest_bytes = new byte[num_bytes_rest];
-                int rest_bytes_recieved = printer.ReadSerialFromHost(rest_bytes, num_bytes_rest);
-                //while (true)    // FIX THIS!!!!
-                //{
-                //    ;
-                //}
+                int rest_bytes_recieved = 0;//printer.ReadSerialFromHost(rest_bytes, num_bytes_rest);
+                // header_recieved[1] should be rest of packet size
+                int test_count = 0;
+                bool timeout_test = false;
+                while ((rest_bytes_recieved = printer.ReadSerialFromHost(rest_bytes, num_bytes_rest)) < num_bytes_rest)    // function inside returns rest_bytes_recieved
+                {
+                    // wait
+                    if (rest_bytes_recieved < num_bytes_rest && test_count >= 100)
+                    {
+                        timeout_test = true;
+                        break;
+                    }    
+                }
                 //      If insufficient bytes are received
-                if (rest_bytes_recieved < num_bytes_rest)   // if number of bytes recieved is less than number of bytes sent
+                if (timeout_test)   // if number of bytes recieved is less than number of bytes sent
                 {
                     //      return “TIMEOUT”
                     byte[] response_bytes = ResponseMaker(timeout);
@@ -120,9 +131,9 @@ namespace Firmware
                 else
                 {
                     //      Validate checksum(Be sure NOT to include checksum values themselves)
-                    byte[] combined = new byte[header_recieved.Length + rest_bytes.Length];
+                    byte[] combined = new byte[header_recieved.Length + rest_bytes.Length]; // change header_revcieved.,length to header_size
                     System.Buffer.BlockCopy(header_recieved, 0, combined, 0, header_recieved.Length);
-                    System.Buffer.BlockCopy(rest_bytes, 0, combined, 0, rest_bytes.Length);
+                    System.Buffer.BlockCopy(rest_bytes, 0, combined, 4, rest_bytes.Length);
 
                     byte[] combined_checksum = Checksum(combined);   // compare bytes 2 and 3 from both the header and what is recieved by adding up both parts: header and rest
                     var combined_checksum_bytes = combined_checksum.Skip(2).Take(2).ToArray();
