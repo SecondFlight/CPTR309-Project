@@ -24,9 +24,10 @@ namespace Firmware
         void Process()
         {
             // Todo - receive incoming commands from the serial link and act on those commands by calling the low-level hardwarwe APIs, etc.
-            while (!fDone)
-            {
-            }
+            //while (!fDone)
+            //{
+            //}
+            FirmwareToHost(printer);
         }
 
         public void Start()
@@ -63,12 +64,12 @@ namespace Firmware
 
             //      After the checksum for the command is calculated, the checksum bytes(2 & 3) are set with the calculated checksum.
             return_packet[2] = (byte)checksum;
-            return_packet[3] = (byte)(checksum >> 8);
+            return_packet[3] = (byte)(checksum << 8);
 
             return return_packet;
         }
 
-        static string FirmwareToHost(byte[] packet, PrinterControl printer)
+        static string FirmwareToHost(PrinterControl printer) // took out byte[] packet, // need to change the return type to the same as the host side
         {
             //Firmware-to-Host Communication Procedure
             int header_size = 4;    // 4 is header size
@@ -82,27 +83,45 @@ namespace Firmware
             string nak = "NAK";
 
             //      Read 4-byte header from host
-            byte[] header_recieved = { 0x00 };
-            int header_bytes_recieved = printer.ReadSerialFromHost(header_recieved, header_size);
-
+            byte[] header_recieved = new byte[header_size];
+            //int header_bytes_recieved = printer.ReadSerialFromHost(header_recieved, header_size);
+            // wait for bytes to be recieved
+            while(printer.ReadSerialFromHost(header_recieved, header_size) < header_size)      // the function returns header_bytes_recieved
+            {
+                ; // wait
+            }
             //      Write 4-byte header back to host
             byte[] header_sent = header_recieved;
             int header_bytes_sent = printer.WriteSerialToHost(header_sent, header_size);
 
             //      Read ACK/NAK byte
-            byte[] ACK_NAK = { 0x00 };
-            int ACK_NAK_recived = printer.ReadSerialFromHost(ACK_NAK, ACK_NAK_size);
-
+            byte[] ACK_NAK = { 0x00 };  // change this to a one element array with nothing in it
+            //int ACK_NAK_recived = printer.ReadSerialFromHost(ACK_NAK, ACK_NAK_size);
+            while(printer.ReadSerialFromHost(ACK_NAK, ACK_NAK_size) < 1)    // function inside returns ACK_NAK_recieved (int)
+            {
+                ; // wait
+            }
             //      If ACK received
-            if (ACK_NAK == ACK)
+            if (ACK_NAK.SequenceEqual(ACK))
             {
                 //      Attempt to read number of parameter bytes indicated in command header
-                byte[] rest_bytes = { 0x00 };
                 int num_bytes_rest = (int)(header_recieved[1]); // header_recieved[1] is the number of bytes in the rest of the packet
-                int rest_bytes_recieved = printer.ReadSerialFromHost(rest_bytes, num_bytes_rest);
-
+                byte[] rest_bytes = new byte[num_bytes_rest];
+                int rest_bytes_recieved = 0;//printer.ReadSerialFromHost(rest_bytes, num_bytes_rest);
+                // header_recieved[1] should be rest of packet size
+                int test_count = 0;
+                bool timeout_test = false;
+                while ((rest_bytes_recieved = printer.ReadSerialFromHost(rest_bytes, num_bytes_rest)) < num_bytes_rest)    // function inside returns rest_bytes_recieved
+                {
+                    // wait
+                    if (rest_bytes_recieved < num_bytes_rest && test_count >= 100)
+                    {
+                        timeout_test = true;
+                        break;
+                    }    
+                }
                 //      If insufficient bytes are received
-                if (rest_bytes_recieved < num_bytes_rest)   // if number of bytes recieved is less than number of bytes sent
+                if (timeout_test)   // if number of bytes recieved is less than number of bytes sent
                 {
                     //      return “TIMEOUT”
                     byte[] response_bytes = ResponseMaker(timeout);
@@ -112,9 +131,9 @@ namespace Firmware
                 else
                 {
                     //      Validate checksum(Be sure NOT to include checksum values themselves)
-                    byte[] combined = new byte[header_recieved.Length + rest_bytes.Length];
+                    byte[] combined = new byte[header_recieved.Length + rest_bytes.Length]; // change header_revcieved.,length to header_size
                     System.Buffer.BlockCopy(header_recieved, 0, combined, 0, header_recieved.Length);
-                    System.Buffer.BlockCopy(rest_bytes, 0, combined, 0, rest_bytes.Length);
+                    System.Buffer.BlockCopy(rest_bytes, 0, combined, 4, rest_bytes.Length);
 
                     byte[] combined_checksum = Checksum(combined);   // compare bytes 2 and 3 from both the header and what is recieved by adding up both parts: header and rest
                     var combined_checksum_bytes = combined_checksum.Skip(2).Take(2).ToArray();
@@ -123,9 +142,9 @@ namespace Firmware
                     //      If checksum correct
                     if (combined_checksum_bytes.SequenceEqual(header_checksum_bytes))    // .SequenceEqual checks the actual value
                     {
-
+                        // Combined should be the packet without the checksum. make sure
                         //      Process      // TYLER's Section
-                        ProcessCommand(packet);     // change from packet to actual packet that goes into the function
+                        ProcessCommand(combined, printer);     // change from packet to actual packet that goes into the function // how can this work without returning????
 
                         //      Return “SUCCESS” or “VERSION n.n”
                         byte[] response_bytes = ResponseMaker(success);
@@ -160,16 +179,68 @@ namespace Firmware
             return return_response;
         }
 
-        static void ProcessCommand(byte[] packet)
+        static void ProcessCommand(byte[] packet, PrinterControl printer)
         {
-            //      Process      // TYLER's Section
-            if (true)   // command = set laser
-            {
-                PrinterControl.SetLaser(true);
-            }
-            else if (command == movegalvos)
-            {
+            //      Process      // TYLER's Section, Recieves byte array . 
+            /*  Byte 0:	  Command byte
+	            Byte 1:   Length of parameter data (# of bytes)
+	            Byte 2:	  Low-byte of 16-bit checksum
+	            Byte 3:   High-byte of 16-bit checksum
+	            Byte 4-n: Parameter data wait ms, stepper, move galvos, remove model, set laser
+            
+             Note: what we need to know is which bytes corespond to controling which of the below commands.
+             */
+            byte command = packet[0];
+            //byte WaitMicroseconds_command = 0x00;
+            //byte ResetStepper_command = 0x00;
+            byte MoveGalvos_command = 0x00;
+            //byte RemoveModelFromPrinter_command = 0x00;
+            byte SetLaser_command = 0x00;
+            byte MoveZ_command = 0x00;
 
+            //if (command == WaitMicroseconds_command) //WaitMicroseconds
+            //{
+            //    // convert from byte to long
+            //    long microsec = 0;
+            //    printer.WaitMicroseconds(microsec);
+            //}
+
+            //if (command == ResetStepper_command)    //ResetStepper
+            //{
+            //    // void function
+            //    printer.ResetStepper();
+            //}
+
+            if (command == MoveGalvos_command)      //MoveGalvos
+            {
+                // convert from byte to float x and float y 
+                byte[] x_substring = new byte[4];   // should I make this 4?
+                Array.Copy(packet, 4, x_substring, 0, 4);
+                byte[] y_substring = new byte[4];   // should I make this 4?
+                Array.Copy(packet, 8, y_substring, 0, 4);
+
+                float x = BitConverter.ToSingle(x_substring, 0);
+                float y = BitConverter.ToSingle(y_substring, 0);
+                printer.MoveGalvos(x, y);
+            }
+
+            //else if (command == RemoveModelFromPrinter_command) //RemoveModelFromPrinter
+            //{
+            //    // void function
+            //    printer.RemoveModelFromPrinter();
+            //}
+
+            else if (command == SetLaser_command) //SetLaser
+            {
+                // convert from byte to bool
+                bool set = BitConverter.ToBoolean(packet, 4);
+                printer.SetLaser(set);
+            }
+            else if (command == MoveZ_command)
+            {
+                // convert from byte to float
+                float z_frombottom = BitConverter.ToSingle(packet, 4);  // converting from byte[] starting at 4 to float
+                // zrailcontroller
             }
         }
     }
