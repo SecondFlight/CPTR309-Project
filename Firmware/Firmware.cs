@@ -144,7 +144,7 @@ namespace Firmware
                     {
                         // Combined should be the packet without the checksum. make sure
                         //      Process      // TYLER's Section
-                        ProcessCommand(combined);     // change from packet to actual packet that goes into the function // how can this work without returning????
+                        ProcessCommand(combined, printer);     // change from packet to actual packet that goes into the function // how can this work without returning????
 
                         //      Return “SUCCESS” or “VERSION n.n”
                         byte[] response_bytes = ResponseMaker(success);
@@ -179,9 +179,9 @@ namespace Firmware
             return return_response;
         }
 
-        static void ProcessCommand(byte[] packet)
+        static void ProcessCommand(byte[] packet, PrinterControl printer)
         {
-            //      Process      // TYLER's Section, Recives byte array . 
+            //      Process      // TYLER's Section, Recieves byte array . 
             /*  Byte 0:	  Command byte
 	            Byte 1:   Length of parameter data (# of bytes)
 	            Byte 2:	  Low-byte of 16-bit checksum
@@ -190,30 +190,57 @@ namespace Firmware
             
              Note: what we need to know is which bytes corespond to controling which of the below commands.
              */
+            byte command = packet[0];
+            //byte WaitMicroseconds_command = 0x00;
+            //byte ResetStepper_command = 0x00;
+            byte MoveGalvos_command = 0x00;
+            //byte RemoveModelFromPrinter_command = 0x00;
+            byte SetLaser_command = 0x00;
+            byte MoveZ_command = 0x00;
 
-            if (byte[?]     == WaitMicrosecondscommand) //WaitMicroseconds
+            //if (command == WaitMicroseconds_command) //WaitMicroseconds
+            //{
+            //    // convert from byte to long
+            //    long microsec = 0;
+            //    printer.WaitMicroseconds(microsec);
+            //}
+
+            //if (command == ResetStepper_command)    //ResetStepper
+            //{
+            //    // void function
+            //    printer.ResetStepper();
+            //}
+
+            if (command == MoveGalvos_command)      //MoveGalvos
             {
-                return WaitMicroseconds(byte[?]);
+                // convert from byte to float x and float y 
+                byte[] x_substring = new byte[4];   // should I make this 4?
+                Array.Copy(packet, 4, x_substring, 0, 4);
+                byte[] y_substring = new byte[4];   // should I make this 4?
+                Array.Copy(packet, 8, y_substring, 0, 4);
+
+                float x = BitConverter.ToSingle(x_substring, 0);
+                float y = BitConverter.ToSingle(y_substring, 0);
+                printer.MoveGalvos(x, y);
             }
 
-            else if (byte[?] == ResetSteppercommand)    //ResetStepper
-            {
-                return ResetStepper(?);
-            }
+            //else if (command == RemoveModelFromPrinter_command) //RemoveModelFromPrinter
+            //{
+            //    // void function
+            //    printer.RemoveModelFromPrinter();
+            //}
 
-            else if (command == MoveGalvoscommand)      //MoveGalvos
+            else if (command == SetLaser_command) //SetLaser
             {
-                return MoveGalvos(?);
+                // convert from byte to bool
+                bool set = BitConverter.ToBoolean(packet, 4);
+                printer.SetLaser(set);
             }
-
-            else if (command == RemoveModelFromPrintercommand) //RemoveModelFromPrinter
+            else if (command == MoveZ_command)
             {
-                return RemoveModelFromPrinter(?);
-            }
-
-            else if (command == SetLasercommand) //SetLaser
-            {
-                return SetLaser(?);
+                // convert from byte to float
+                float z_frombottom = BitConverter.ToSingle(packet, 4);  // converting from byte[] starting at 4 to float
+                // zrailcontroller
             }
         }
     }
