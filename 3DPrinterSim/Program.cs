@@ -23,7 +23,7 @@ namespace PrinterSimulator
     {
         static void PrintFile(PrinterControl simCtl)
         {
-            Console.Clear();
+            //Console.Clear();
             Console.WriteLine("\nDefault file will be used unless alternate file is given");
             Console.WriteLine("Press any key to continue");
             Console.ReadKey();
@@ -57,7 +57,7 @@ namespace PrinterSimulator
             double currentX = 0;
             double currentY = 0;
             double currentZ = 0;
-            double currentSize = 0;
+            bool isLaserOn = false;
 
             foreach (var line in instructions.AllLines())
             {
@@ -66,42 +66,132 @@ namespace PrinterSimulator
                     //Console.WriteLine(line.code);
                     if (line.code == 1)
                     {
+                        bool containsX = false;
+                        bool containsY = false;
+                        bool containsZ = false;
+                        bool containsE = false;
                         foreach (var parameter in line.parameters)
                         {
                             if (parameter.identifier.ToUpper() == "X")
                             {
                                 currentX = parameter.doubleValue;
+                                containsX = true;
                             }
 
                             if (parameter.identifier.ToUpper() == "Y")
                             {
                                 currentY = parameter.doubleValue;
+                                containsY = true;
                             }
 
                             if (parameter.identifier.ToUpper() == "Z")
                             {
                                 currentZ = parameter.doubleValue;
+                                containsZ = true;
                             }
 
                             if (parameter.identifier.ToUpper() == "E")
                             {
-                                currentSize = parameter.doubleValue;
+                                isLaserOn = parameter.doubleValue > 0;
+                                containsE = true;
+                            }
+                        }
+
+                        // Command number: 0x00
+                        // Format: X (4 bytes), Y (4 bytes)
+                        if (containsX && containsY)
+                        {
+                            var bytesToSend = new byte[12];
+                            bytesToSend[0] = 0x00; // Command number
+                            bytesToSend[1] = 0x08; // Data length
+                            bytesToSend[2] = 0x00; // Blank (for checksum)
+                            bytesToSend[3] = 0x00; // Blank (for checksum)
+
+                            // Convert x position and y position to a byte array
+                            var xBytes = BitConverter.GetBytes((float)currentX);
+                            var yBytes = BitConverter.GetBytes((float)currentY);
+
+                            // Insert x position
+                            for (int i = 0; i < xBytes.Length; i++)
+                            {
+                                bytesToSend[i + 4] = xBytes[i];
                             }
 
-                            // TODO: Send printer command (replace below with function call)
-                            Console.WriteLine("X: " + currentX.ToString() + ", Y: " + currentY.ToString() + ", Z: " + currentZ.ToString() + ", size: " + currentSize.ToString());
+                            // Insert y position
+                            for (int i = 0; i < yBytes.Length; i++)
+                            {
+                                bytesToSend[i + 8] = yBytes[i];
+                            }
+
+                            // Send data
+                            if (!HostToFirmware(bytesToSend, simCtl))
+                            {
+                                Console.WriteLine("Print failed - command failed to send.");
+                                return;
+                            }
+                        }
+
+                        // Command number: 0x01
+                        // Format: Z (4 bytes)
+                        else if (containsZ)
+                        {
+                            var bytesToSend = new byte[8];
+                            bytesToSend[0] = 0x01; // Command number
+                            bytesToSend[1] = 0x04; // Data length   // changed from 04
+                            bytesToSend[2] = 0x00; // Blank (for checksum)
+                            bytesToSend[3] = 0x00; // Blank (for checksum)
+
+                            // Convert z position to a byte array
+                            var zBytes = BitConverter.GetBytes((float)currentZ);
+
+                            // Insert z position
+                            for (int i = 0; i < zBytes.Length; i++)
+                            {
+                                bytesToSend[i + 4] = zBytes[i];
+                            }
+
+                            // Send data
+                            if (!HostToFirmware(bytesToSend, simCtl))
+                            {
+                                Console.WriteLine("Print failed - command failed to send.");
+                                return;
+                            }
+                        }
+                        else if (containsX || containsY)
+                        {
+                            throw new InvalidDataException("Invalid GCode command - command contains one X/Y command without the other.");
+                        }
+
+                        // Separately, if it contains an E
+                        // Command number: 0x02
+                        // Format: isLaserOn (1 byte)
+                        if (containsE)
+                        {
+                            var bytesToSend = new byte[8];
+                            bytesToSend[0] = 0x02; // Command number
+                            bytesToSend[1] = 0x01; // Data length
+                            bytesToSend[2] = 0x00; // Blank (for checksum)
+                            bytesToSend[3] = 0x00; // Blank (for checksum)
+
+                            // Convert z position to a byte array
+                            var isLaserOnBytes = BitConverter.GetBytes(isLaserOn);
+
+                            // Insert isLaserOn
+                            for (int i = 0; i < isLaserOnBytes.Length; i++)
+                            {
+                                bytesToSend[i + 4] = isLaserOnBytes[i];
+                            }
+
+                            // Send data
+                            if (!HostToFirmware(bytesToSend, simCtl))
+                            {
+                                Console.WriteLine("Print failed - command failed to send.");
+                                return;
+                            }
                         }
                     }
-                    /*
-                    foreach (var parameter in line.parameters)
-                    {
-                        if (parameter.identifier.ToUpper() == "E")
-                        {
-                            
-                        }
-                    }*/
-        }
-    }
+                }
+            }
 
             swTimer.Stop();
             long elapsedMS = swTimer.ElapsedMilliseconds;
@@ -131,8 +221,22 @@ namespace PrinterSimulator
 
             return return_packet;
         }
-        static string HostToFirmware(byte[] packet, PrinterControl simCtl) // MAKE COPIES OF ALL THE THINGS
+
+        /*
+         * HostToFirmware
+         * 
+         * Returns: true on success, false on failure
+         * Arguments:
+         *   packet: Packet to be sent
+         *   simCtl: PrinterControl variable that gets passed around to everything
+         *   (optional) maxRetries: Maximum number of retries before faliure is returned
+         *   (internal) currentRetry: Used internally to track the current retry count
+         */
+        static bool HostToFirmware(byte[] packet, PrinterControl simCtl, int maxRetries = 10, int currentRetry = 0) // MAKE COPIES OF ALL THE THINGS
         {
+            if (currentRetry >= maxRetries)
+                return false;
+
             //        Host-to-Firmware Communication Procedure
             int header_size = 4;    // 4 is header size
             int response_size = 0;  // UNSURE OF SIZE OF RESPONSE
@@ -145,14 +249,18 @@ namespace PrinterSimulator
             //      Send 4-byte header consisting of command byte, length, and 16-bit checksum
             byte[] checksummed_packet = Checksum(packet);
             byte[] header = checksummed_packet.Skip(0).Take(header_size).ToArray();   // array substring from Skip and Take, 0 to 4
-            var header_copy = header;   // making a copy for header to go in
+            var header_copy = header;   // making a copy for header to go in so it doesn't change it
             int header_bytes_sent = simCtl.WriteSerialToFirmware(header_copy, header_size);
 
             //      Read header bytes back from firmware to verify correct receipt of command header
-            byte[] possible_header = { 0x00 };
-            int header_bytes_recieved = simCtl.ReadSerialFromFirmware(possible_header, header_size); 
-            
-            //      If header is correct
+            byte[] possible_header = new byte[header_size];
+            // int header_bytes_recieved = simCtl.ReadSerialFromFirmware(possible_header, header_size);
+            while(simCtl.ReadSerialFromFirmware(possible_header, header_size) < header_size)    // function inside returns header_bytes_recieved
+            {
+                ;  // wait for four bytes to be recieved // 4 bytes
+            }
+            int test = 0;
+                                                           //      If header is correct
             if (header.SequenceEqual(possible_header))  // header == possible_header
             {
                 //      Send ACK(0xA5) to firmware
@@ -163,10 +271,10 @@ namespace PrinterSimulator
                 int rest_bytes_sent = simCtl.WriteSerialToFirmware(rest_bytes_send, packet.Length - header_size);
 
                 //      Wait for first byte of response to be received
-                byte[] response_bytes = { 0x00 };
-                int response_bytes_recieved = simCtl.ReadSerialFromFirmware(response_bytes, response_size);
+                byte[] response_bytes = new byte[response_size];
+                //int response_bytes_recieved = simCtl.ReadSerialFromFirmware(response_bytes, response_size);
                 
-                while (response_bytes_recieved < 1)
+                while (simCtl.ReadSerialFromFirmware(response_bytes, response_size) < 1 )   // function returns response_bytes_received
                 {
                     ;   // wait
                 }
@@ -185,12 +293,12 @@ namespace PrinterSimulator
                 //      Verify that response string equals “SUCCESS” or “VERSION n.n” (If not, re-send entire command)
                 if (response_string == success)    //  || response_bytes == "VERSION n.n"
                 {
-                    return success;
+                    return true;
                 }
                 else
                 {
                     //      retry command
-                    return HostToFirmware(packet, simCtl);  // this retries the command and returns the result of that command
+                    return HostToFirmware(packet, simCtl, maxRetries, currentRetry + 1);  // this retries the command and returns the result of that command
                 }
             }
             //      else if header is not received correctly
@@ -200,7 +308,7 @@ namespace PrinterSimulator
                 int NAK_send = simCtl.WriteSerialToFirmware(NAK, ACK_NAK_size);
 
                 //      Retry command
-                return HostToFirmware(packet, simCtl);  // this retries the command and returns the result of that command
+                return HostToFirmware(packet, simCtl, maxRetries, currentRetry + 1);  // this retries the command and returns the result of that command
             }
         }
 
@@ -250,7 +358,7 @@ namespace PrinterSimulator
             bool fDone = false;
             while (!fDone)
             {
-                Console.Clear();
+                //Console.Clear();
                 Console.WriteLine("3D Printer Simulation - Control Menu\n");
                 Console.WriteLine("P - Print");
                 Console.WriteLine("T - Test");
