@@ -57,7 +57,7 @@ namespace Firmware
 
         static byte[] Checksum(byte[] packet)
         {
-            byte[] return_packet = packet;
+            byte[] return_packet = packet.ToArray();
             ushort checksum = 0;
             //      When adding bytes, the checksum fields are initialized to zero.
             return_packet[2] = 0x00;
@@ -71,7 +71,7 @@ namespace Firmware
 
             //      After the checksum for the command is calculated, the checksum bytes(2 & 3) are set with the calculated checksum.
             return_packet[2] = (byte)checksum;
-            return_packet[3] = (byte)(checksum << 8);
+            return_packet[3] = (byte)(checksum >> 8);
 
             return return_packet;
         }
@@ -118,7 +118,7 @@ namespace Firmware
             printByteArray(header_recieved, "Firmware received header");
 
             //      Write 4-byte header back to host
-            byte[] header_sent = header_recieved;
+            byte[] header_sent = header_recieved.ToArray();
             printByteArray(header_sent, "Firmware sent header");
             int header_bytes_sent = printer.WriteSerialToHost(header_sent, header_size);
 
@@ -190,7 +190,11 @@ namespace Firmware
                         //      Return “CHECKSUM”
                         byte[] response_bytes = ResponseMaker(checksum);
                         printByteArray(response_bytes, "Firmware sent Checksum response");
-                        int response_bytes_sent = printer.WriteSerialToHost(response_bytes, response_size);
+                        //while(printer.WriteSerialToHost(response_bytes, response_size) == 1)
+                        //{
+                        //    ; // wait for all to send
+                        //}
+                        int response_bytes_sent = printer.WriteSerialToHost(response_bytes, response_bytes.Length);
                         return checksum;
                     }
                 }

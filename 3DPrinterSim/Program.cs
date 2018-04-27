@@ -204,7 +204,7 @@ namespace PrinterSimulator
 
         static byte[] Checksum(byte[] packet)
         {
-            byte[] return_packet = packet;
+            byte[] return_packet = packet.ToArray();
             ushort checksum = 0;
             //      When adding bytes, the checksum fields are initialized to zero.
             return_packet[2] = 0x00;
@@ -256,7 +256,7 @@ namespace PrinterSimulator
             //      Send 4-byte header consisting of command byte, length, and 16-bit checksum
             byte[] checksummed_packet = Checksum(packet);
             byte[] header = checksummed_packet.Skip(0).Take(header_size).ToArray();   // array substring from Skip and Take, 0 to 4
-            var header_copy = header;   // making a copy for header to go in so it doesn't change it
+            var header_copy = header.ToArray();   // making a copy for header to go in so it doesn't change it
             printByteArray(header_copy, "Host sending header");
             int header_bytes_sent = simCtl.WriteSerialToFirmware(header_copy, header_size);
 
@@ -275,7 +275,7 @@ namespace PrinterSimulator
             if (header.SequenceEqual(possible_header))  // header == possible_header
             {
                 //      Send ACK(0xA5) to firmware
-                byte[] ACK_to_send = ACK;
+                byte[] ACK_to_send = ACK.ToArray();
                 printByteArray(ACK_to_send, "Host sending ack");
                 int ACK_send = simCtl.WriteSerialToFirmware(ACK_to_send, ACK_NAK_size);    // 1 is the size of the ACK and NAK bytes
 
@@ -334,7 +334,7 @@ namespace PrinterSimulator
             else
             {
                 //      Send NAK(0xFF)
-                byte[] NAK_to_send = NAK;
+                byte[] NAK_to_send = NAK.ToArray();
                 printByteArray(NAK_to_send, "Host sending nak :(");
                 int NAK_send = simCtl.WriteSerialToFirmware(NAK_to_send, ACK_NAK_size);
                 Console.Write("retry NAK \n");
