@@ -69,7 +69,7 @@ namespace Firmware
             return return_packet;
         }
 
-        static string FirmwareToHost(PrinterControl printer) // took out byte[] packet, // need to change the return type to the same as the host side
+        static void FirmwareToHost(PrinterControl printer) // took out byte[] packet, // need to change the return type to the same as the host side
         {
             //Firmware-to-Host Communication Procedure
             int header_size = 4;    // 4 is header size
@@ -126,7 +126,7 @@ namespace Firmware
                     //      return “TIMEOUT”
                     byte[] response_bytes = ResponseMaker(timeout);
                     int response_bytes_sent = printer.WriteSerialToHost(response_bytes, response_size);
-                    return timeout;
+                    //return timeout;
                 }
                 else
                 {
@@ -148,8 +148,8 @@ namespace Firmware
 
                         //      Return “SUCCESS” or “VERSION n.n”
                         byte[] response_bytes = ResponseMaker(success);
-                        int response_bytes_sent = printer.WriteSerialToHost(response_bytes, response_size);
-                        return success;
+                        int response_bytes_sent = printer.WriteSerialToHost(response_bytes, response_bytes.Length);
+                        //return success;
                     }
                     //      Else
                     else
@@ -157,7 +157,7 @@ namespace Firmware
                         //      Return “CHECKSUM”
                         byte[] response_bytes = ResponseMaker(checksum);
                         int response_bytes_sent = printer.WriteSerialToHost(response_bytes, response_size);
-                        return checksum;
+                        //return checksum;
                     }
                 }
             }
@@ -165,18 +165,23 @@ namespace Firmware
             else if (ACK_NAK == NAK)
             {
                 //      Ignore command – it will be resent
-                return nak;
+                //return nak;
             }
             else
             {
-                return "Unknown byte";  // should never get to this 
+                //return "Unknown byte";  // should never get to this 
             }
         }
 
         static byte[] ResponseMaker(string response_string)
         {
-            byte[] return_response = Encoding.ASCII.GetBytes(response_string);  // Make sure this encoding 
-            return return_response;
+            byte[] return_response = Encoding.ASCII.GetBytes(response_string);  // Make sure this encoding works
+            // to add the null_byte to the end
+            byte null_byte = 0x30;
+            byte[] new_response = new byte[return_response.Length + 1];
+            return_response.CopyTo(new_response, 0);
+            new_response[new_response.Length - 1] = null_byte;
+            return new_response;
         }
 
         static void ProcessCommand(byte[] packet, PrinterControl printer)
@@ -191,12 +196,13 @@ namespace Firmware
              Note: what we need to know is which bytes corespond to controling which of the below commands.
              */
             byte command = packet[0];
-            //byte WaitMicroseconds_command = 0x00;
-            //byte ResetStepper_command = 0x00;
+
             byte MoveGalvos_command = 0x00;
-            //byte RemoveModelFromPrinter_command = 0x00;
             byte SetLaser_command = 0x00;
             byte MoveZ_command = 0x00;
+            //byte WaitMicroseconds_command = 0x00;
+            //byte ResetStepper_command = 0x00;
+            //byte RemoveModelFromPrinter_command = 0x00;
 
             //if (command == WaitMicroseconds_command) //WaitMicroseconds
             //{
@@ -221,7 +227,9 @@ namespace Firmware
 
                 float x = BitConverter.ToSingle(x_substring, 0);
                 float y = BitConverter.ToSingle(y_substring, 0);
-                printer.MoveGalvos(x, y);
+                float x_voltage = (float)(x * (2.5 / 100));  // find a better way to do these magic numbers
+                float y_voltage = (float)(y * (2.5 / 100));
+                printer.MoveGalvos(x, y);   // sends voltages to MoveGalvos();
             }
 
             //else if (command == RemoveModelFromPrinter_command) //RemoveModelFromPrinter

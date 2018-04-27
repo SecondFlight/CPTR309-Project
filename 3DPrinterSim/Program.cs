@@ -232,16 +232,22 @@ namespace PrinterSimulator
          *   (optional) maxRetries: Maximum number of retries before faliure is returned
          *   (internal) currentRetry: Used internally to track the current retry count
          */
+
+            // MAKE SURE TO CHANGE MAXRETI
         static bool HostToFirmware(byte[] packet, PrinterControl simCtl, int maxRetries = 10, int currentRetry = 0) // MAKE COPIES OF ALL THE THINGS
         {
             if (currentRetry >= maxRetries)
+            {
                 return false;
+            }
+
 
             //        Host-to-Firmware Communication Procedure
             int header_size = 4;    // 4 is header size
-            int response_size = 0;  // UNSURE OF SIZE OF RESPONSE
+            int response_size = 1;  // So it reads one byte at a time
             int ACK_NAK_size = 1;   // size of both ACK and NAK bytes
-            byte null_byte = 0x30;
+            byte null_byte = 0x30;  // Null byte
+            int max_size = 20;
             byte[] ACK = { 0xA5 };  // ACK byte 
             byte[] NAK = { 0xFF };  // ACK byte
             string success = "SUCCESS";
@@ -255,6 +261,7 @@ namespace PrinterSimulator
             //      Read header bytes back from firmware to verify correct receipt of command header
             byte[] possible_header = new byte[header_size];
             // int header_bytes_recieved = simCtl.ReadSerialFromFirmware(possible_header, header_size);
+            //===========THIS SEEMS TO NOT WORK ALL THE TIME, IT DEFINITELY WORKS AT LEAST ONCE=====================================
             while(simCtl.ReadSerialFromFirmware(possible_header, header_size) < header_size)    // function inside returns header_bytes_recieved
             {
                 ;  // wait for four bytes to be recieved // 4 bytes
@@ -268,27 +275,39 @@ namespace PrinterSimulator
 
                 //      Send rest of packet not including the 4-byte header
                 byte[] rest_bytes_send = checksummed_packet.Skip(header_size).Take(checksummed_packet.Length - header_size).ToArray();  // array substring
-                int rest_bytes_sent = simCtl.WriteSerialToFirmware(rest_bytes_send, packet.Length - header_size);
+                int rest_bytes_sent = simCtl.WriteSerialToFirmware(rest_bytes_send, packet.Length - header_size);   // change last argument to parameter data length in the 4th byte
 
                 //      Wait for first byte of response to be received
-                byte[] response_bytes = new byte[response_size];
+                byte[] response_byte = new byte[response_size];
+                byte[] response_bytes = new byte[max_size];
+                int num_received = 0;
+                int i = 0;
                 //int response_bytes_recieved = simCtl.ReadSerialFromFirmware(response_bytes, response_size);
                 
-                while (simCtl.ReadSerialFromFirmware(response_bytes, response_size) < 1 )   // function returns response_bytes_received
-                {
-                    ;   // wait
-                }
+                //while (simCtl.ReadSerialFromFirmware(response_bytes, response_size) < 1 )   // function returns response_bytes_received
+                //{
+                //    ;   // wait
+                //}
 
                 //      Continue reading rest of response until null byte (0) is received
                 while (true)
                 {
-                    if (response_bytes[response_bytes.Length - 1] == null_byte) // should I use .SequenceEqual()?
+                    num_received = simCtl.ReadSerialFromFirmware(response_byte, 1);
+                    if(num_received == 1)
+                    {
+                        i++;    // ++'s the number of bytes received
+                        response_bytes[i] = response_byte[response_byte.Length - 1];    // fills the byte[] with the bytes starting at 1 for some reason
+                        num_received = 0;   // resets num_received
+                    }
+
+                    if (response_bytes[i] == null_byte) // should I use .SequenceEqual()?
                     {
                         break;  // exit the wait loop
                     }
-                }
 
-                string response_string = System.Text.Encoding.ASCII.GetString(response_bytes);
+                }
+                var new_response = response_bytes.Skip(1).Take(i - 1).ToArray();    // i - 1 to take off the null and skip 1 to get rid of the 0 in first
+                string response_string = System.Text.Encoding.ASCII.GetString(new_response);    // converts from byte[] to string
 
                 //      Verify that response string equals “SUCCESS” or “VERSION n.n” (If not, re-send entire command)
                 if (response_string == success)    //  || response_bytes == "VERSION n.n"
