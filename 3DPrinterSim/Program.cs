@@ -21,6 +21,7 @@ namespace PrinterSimulator
 {
     class PrintSim
     {
+
         static void PrintFile(PrinterControl simCtl)
         {
             //Console.Clear();
@@ -58,6 +59,9 @@ namespace PrinterSimulator
             double currentY = 0;
             double currentZ = 0;
             bool isLaserOn = false;
+            bool oldIsLaserOn = false;
+
+            int instructionCount = 0;
 
             foreach (var line in instructions.AllLines())
             {
@@ -101,6 +105,8 @@ namespace PrinterSimulator
                         // Format: X (4 bytes), Y (4 bytes)
                         if (containsX && containsY)
                         {
+                            instructionCount++;
+                            //continue;
                             var bytesToSend = new byte[12];
                             bytesToSend[0] = 0x00; // Command number
                             bytesToSend[1] = 0x08; // Data length
@@ -124,8 +130,9 @@ namespace PrinterSimulator
                             }
 
                             // Send data
-                            if (!HostToFirmware(bytesToSend, simCtl))
+                            if (!HostToFirmware(bytesToSend, simCtl))   // NOTE: the first byte here is 8!!!!!!!!!!!!!=============
                             {
+                                //Console.Write("retry");
                                 Console.WriteLine("Print failed - command failed to send.");
                                 return;
                             }
@@ -135,6 +142,8 @@ namespace PrinterSimulator
                         // Format: Z (4 bytes)
                         else if (containsZ)
                         {
+                            instructionCount++;
+                            //continue;
                             var bytesToSend = new byte[8];
                             bytesToSend[0] = 0x01; // Command number
                             bytesToSend[1] = 0x04; // Data length   // changed from 04
@@ -165,8 +174,11 @@ namespace PrinterSimulator
                         // Separately, if it contains an E
                         // Command number: 0x02
                         // Format: isLaserOn (1 byte)
-                        if (containsE)
+                        if (containsE && (isLaserOn != oldIsLaserOn))
                         {
+                            oldIsLaserOn = isLaserOn;
+                            instructionCount++;
+                            //continue;
                             var bytesToSend = new byte[8];
                             bytesToSend[0] = 0x02; // Command number
                             bytesToSend[1] = 0x01; // Data length
@@ -193,6 +205,8 @@ namespace PrinterSimulator
                 }
             }
 
+            Console.WriteLine("Host: There were " + instructionCount.ToString() + " instructions sent by the host.");
+
             swTimer.Stop();
             long elapsedMS = swTimer.ElapsedMilliseconds;
 
@@ -203,7 +217,7 @@ namespace PrinterSimulator
 
         static byte[] Checksum(byte[] packet)
         {
-            byte[] return_packet = packet;
+            byte[] return_packet = packet.ToArray();
             ushort checksum = 0;
             //      When adding bytes, the checksum fields are initialized to zero.
             return_packet[2] = 0x00;
@@ -232,16 +246,22 @@ namespace PrinterSimulator
          *   (optional) maxRetries: Maximum number of retries before faliure is returned
          *   (internal) currentRetry: Used internally to track the current retry count
          */
+
+            // MAKE SURE TO CHANGE MAXRETI
         static bool HostToFirmware(byte[] packet, PrinterControl simCtl, int maxRetries = 10, int currentRetry = 0) // MAKE COPIES OF ALL THE THINGS
         {
             if (currentRetry >= maxRetries)
+            {
                 return false;
+            }
 
+            //Console.Write("+++++++++++++++NEXT COMMAND++++++++++++++++ \n");
             //        Host-to-Firmware Communication Procedure
-            int header_size = 4;    // 4 is header size
-            int response_size = 0;  // UNSURE OF SIZE OF RESPONSE
+            const int header_size = 4;    // 4 is header size
+            int response_size = 1;  // So it reads one byte at a time
             int ACK_NAK_size = 1;   // size of both ACK and NAK bytes
-            byte null_byte = 0x30;
+            byte null_byte = 0x30;  // Null byte
+            const int max_size = 20;
             byte[] ACK = { 0xA5 };  // ACK byte 
             byte[] NAK = { 0xFF };  // ACK byte
             string success = "SUCCESS";
@@ -249,46 +269,67 @@ namespace PrinterSimulator
             //      Send 4-byte header consisting of command byte, length, and 16-bit checksum
             byte[] checksummed_packet = Checksum(packet);
             byte[] header = checksummed_packet.Skip(0).Take(header_size).ToArray();   // array substring from Skip and Take, 0 to 4
-            var header_copy = header;   // making a copy for header to go in so it doesn't change it
+            var header_copy = header.ToArray();   // making a copy for header to go in so it doesn't change it
+            printByteArray(header_copy, "Host sending header");
             int header_bytes_sent = simCtl.WriteSerialToFirmware(header_copy, header_size);
 
             //      Read header bytes back from firmware to verify correct receipt of command header
             byte[] possible_header = new byte[header_size];
             // int header_bytes_recieved = simCtl.ReadSerialFromFirmware(possible_header, header_size);
-            while(simCtl.ReadSerialFromFirmware(possible_header, header_size) < header_size)    // function inside returns header_bytes_recieved
+            
+            while (simCtl.ReadSerialFromFirmware(possible_header, header_size) < header_size)    // function inside returns header_bytes_recieved
             {
                 ;  // wait for four bytes to be recieved // 4 bytes
             }
             int test = 0;
-                                                           //      If header is correct
+            printByteArray(possible_header, "Host received header response");
+
+            //      If header is correct
             if (header.SequenceEqual(possible_header))  // header == possible_header
             {
                 //      Send ACK(0xA5) to firmware
-                int ACK_send = simCtl.WriteSerialToFirmware(ACK, ACK_NAK_size);    // 1 is the size of the ACK and NAK bytes
+                byte[] ACK_to_send = ACK.ToArray();
+                printByteArray(ACK_to_send, "Host sending ack");
+                int ACK_send = simCtl.WriteSerialToFirmware(ACK_to_send, ACK_NAK_size);    // 1 is the size of the ACK and NAK bytes
 
                 //      Send rest of packet not including the 4-byte header
                 byte[] rest_bytes_send = checksummed_packet.Skip(header_size).Take(checksummed_packet.Length - header_size).ToArray();  // array substring
-                int rest_bytes_sent = simCtl.WriteSerialToFirmware(rest_bytes_send, packet.Length - header_size);
+                printByteArray(rest_bytes_send, "Host sending remaining bytes");
+                int rest_bytes_sent = simCtl.WriteSerialToFirmware(rest_bytes_send, packet.Length - header_size);   // change last argument to parameter data length in the 4th byte
 
                 //      Wait for first byte of response to be received
-                byte[] response_bytes = new byte[response_size];
+                byte[] response_byte = new byte[response_size];
+                byte[] response_bytes = new byte[max_size];
+                int num_received = 0;
+                int i = 0;
                 //int response_bytes_recieved = simCtl.ReadSerialFromFirmware(response_bytes, response_size);
-                
-                while (simCtl.ReadSerialFromFirmware(response_bytes, response_size) < 1 )   // function returns response_bytes_received
-                {
-                    ;   // wait
-                }
-
                 //      Continue reading rest of response until null byte (0) is received
-                while (true)
+                while (true)    // might get hung up here
                 {
-                    if (response_bytes[response_bytes.Length - 1] == null_byte) // should I use .SequenceEqual()?
+                    num_received = simCtl.ReadSerialFromFirmware(response_byte, 1);
+                    if(num_received == 1)
+                    {
+                        i++;    // ++'s the number of bytes received
+                        response_bytes[i] = response_byte[response_byte.Length - 1];    // fills the byte[] with the bytes starting at 1 for some reason
+                        num_received = 0;   // resets num_received
+                    }
+
+                    if (response_bytes[i] == null_byte) // should I use .SequenceEqual()?
                     {
                         break;  // exit the wait loop
                     }
-                }
+                    else if (i >= max_size)
+                    {
+                        Console.Write("Broke when trying to read response \n");
+                        return false;
+                    }
 
-                string response_string = System.Text.Encoding.ASCII.GetString(response_bytes);
+                }
+                var new_response = response_bytes.Skip(1).Take(i - 1).ToArray();    // i - 1 to take off the null and skip 1 to get rid of the 0 in first
+                string response_string = System.Text.Encoding.ASCII.GetString(new_response);    // converts from byte[] to string
+                printByteArray(response_bytes, "Host received response string " + response_string);
+
+
 
                 //      Verify that response string equals “SUCCESS” or “VERSION n.n” (If not, re-send entire command)
                 if (response_string == success)    //  || response_bytes == "VERSION n.n"
@@ -297,6 +338,7 @@ namespace PrinterSimulator
                 }
                 else
                 {
+                    Console.Write("retry NO SUCCESS  \n");
                     //      retry command
                     return HostToFirmware(packet, simCtl, maxRetries, currentRetry + 1);  // this retries the command and returns the result of that command
                 }
@@ -305,15 +347,34 @@ namespace PrinterSimulator
             else
             {
                 //      Send NAK(0xFF)
-                int NAK_send = simCtl.WriteSerialToFirmware(NAK, ACK_NAK_size);
-
+                byte[] NAK_to_send = NAK.ToArray();
+                printByteArray(NAK_to_send, "Host sending nak :(");
+                int NAK_send = simCtl.WriteSerialToFirmware(NAK_to_send, ACK_NAK_size);
+                Console.Write("retry NAK \n");
                 //      Retry command
                 return HostToFirmware(packet, simCtl, maxRetries, currentRetry + 1);  // this retries the command and returns the result of that command
             }
         }
 
+        static void printByteArray(byte[] bytesToPrint, string message)
+        {
+            return;
+            Console.Write(message);
+            Console.Write(" [");
+            bool firstIter = true;
+            foreach (var item in bytesToPrint)
+            {
+                if (firstIter)
+                    firstIter = false;
+                else
+                    Console.Write(", ");
+                Console.Write(item.ToString());
+            }
+            Console.WriteLine("] \n");
+        }
+
         //  This function will be later moved to Firmware.cs as it is Firmware to Host side of things
-        
+
 
         //static string ToString(byte[] bytes)
         //{

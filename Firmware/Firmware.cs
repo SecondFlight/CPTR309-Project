@@ -27,7 +27,19 @@ namespace Firmware
             //while (!fDone)
             //{
             //}
-            FirmwareToHost(printer);
+            //int test = 0;
+            int num_commands = 0;
+            while (true)
+            {
+                
+                string result = FirmwareToHost(printer);
+                if (fDone)
+                    break;
+                num_commands++;
+                //Console.Write(result + " " + num_commands + "\n");
+            }
+            //test++;
+            //FirmwareToHost(printer);
         }
 
         public void Start()
@@ -50,7 +62,7 @@ namespace Firmware
 
         static byte[] Checksum(byte[] packet)
         {
-            byte[] return_packet = packet;
+            byte[] return_packet = packet.ToArray();
             ushort checksum = 0;
             //      When adding bytes, the checksum fields are initialized to zero.
             return_packet[2] = 0x00;
@@ -64,16 +76,33 @@ namespace Firmware
 
             //      After the checksum for the command is calculated, the checksum bytes(2 & 3) are set with the calculated checksum.
             return_packet[2] = (byte)checksum;
-            return_packet[3] = (byte)(checksum << 8);
+            return_packet[3] = (byte)(checksum >> 8);
 
             return return_packet;
         }
-
-        static string FirmwareToHost(PrinterControl printer) // took out byte[] packet, // need to change the return type to the same as the host side
+        static void ClearBuffer(PrinterControl printer)
+        {
+            int response_size = 1;
+            byte[] read_byte = new byte[response_size];
+            int num_received = 0;
+            while (true)    // might get hung up here
+            {
+                num_received = printer.ReadSerialFromHost(read_byte, 1);
+                if (num_received == 1)
+                {
+                    num_received = 0;   // resets num_received
+                }
+                else
+                {
+                    return;
+                }
+            }
+        }
+        string FirmwareToHost(PrinterControl printer) // took out byte[] packet, // need to change the return type to the same as the host side
         {
             //Firmware-to-Host Communication Procedure
             int header_size = 4;    // 4 is header size
-            int response_size = 0;  // UNSURE OF SIZE OF RESPONSE
+            int response_size = 1;  // UNSURE OF SIZE OF RESPONSE
             int ACK_NAK_size = 1;   // size of both ACK and NAK bytes
             byte[] ACK = { 0xA5 };  // ACK byte 
             byte[] NAK = { 0xFF };  // ACK byte
@@ -84,30 +113,35 @@ namespace Firmware
 
             //      Read 4-byte header from host
             byte[] header_recieved = new byte[header_size];
-            //int header_bytes_recieved = printer.ReadSerialFromHost(header_recieved, header_size);
+
             // wait for bytes to be recieved
             while(printer.ReadSerialFromHost(header_recieved, header_size) < header_size)      // the function returns header_bytes_recieved
             {
                 ; // wait
             }
+            ClearBuffer(printer);  // This should clear the buffer  
+            printByteArray(header_recieved, "Firmware received header");
+
             //      Write 4-byte header back to host
-            byte[] header_sent = header_recieved;
+            byte[] header_sent = header_recieved.ToArray();
+            printByteArray(header_sent, "Firmware sent header");
             int header_bytes_sent = printer.WriteSerialToHost(header_sent, header_size);
 
             //      Read ACK/NAK byte
             byte[] ACK_NAK = { 0x00 };  // change this to a one element array with nothing in it
-            //int ACK_NAK_recived = printer.ReadSerialFromHost(ACK_NAK, ACK_NAK_size);
             while(printer.ReadSerialFromHost(ACK_NAK, ACK_NAK_size) < 1)    // function inside returns ACK_NAK_recieved (int)
             {
                 ; // wait
             }
+            //ClearBuffer(printer);  // This should clear the buffer  
+            printByteArray(ACK_NAK, "Firmware received ACK or NAK");
             //      If ACK received
             if (ACK_NAK.SequenceEqual(ACK))
             {
                 //      Attempt to read number of parameter bytes indicated in command header
                 int num_bytes_rest = (int)(header_recieved[1]); // header_recieved[1] is the number of bytes in the rest of the packet
                 byte[] rest_bytes = new byte[num_bytes_rest];
-                int rest_bytes_recieved = 0;//printer.ReadSerialFromHost(rest_bytes, num_bytes_rest);
+                int rest_bytes_recieved = 0;
                 // header_recieved[1] should be rest of packet size
                 int test_count = 0;
                 bool timeout_test = false;
@@ -120,11 +154,14 @@ namespace Firmware
                         break;
                     }    
                 }
+                ClearBuffer(printer);  // This should clear the buffer  
+                printByteArray(rest_bytes, "Firmware received data");
                 //      If insufficient bytes are received
                 if (timeout_test)   // if number of bytes recieved is less than number of bytes sent
                 {
                     //      return “TIMEOUT”
                     byte[] response_bytes = ResponseMaker(timeout);
+                    printByteArray(response_bytes, "Firmware sent response");
                     int response_bytes_sent = printer.WriteSerialToHost(response_bytes, response_size);
                     return timeout;
                 }
@@ -148,38 +185,69 @@ namespace Firmware
 
                         //      Return “SUCCESS” or “VERSION n.n”
                         byte[] response_bytes = ResponseMaker(success);
-                        int response_bytes_sent = printer.WriteSerialToHost(response_bytes, response_size);
-                        return success;
+                        printByteArray(response_bytes, "Firmware sent Success or Version response");
+                        int response_bytes_sent = printer.WriteSerialToHost(response_bytes, response_bytes.Length);
+                        //ClearBuffer(printer);  // This should clear the buffer  
+                        return success; // SUCCESS
                     }
                     //      Else
                     else
                     {
                         //      Return “CHECKSUM”
                         byte[] response_bytes = ResponseMaker(checksum);
-                        int response_bytes_sent = printer.WriteSerialToHost(response_bytes, response_size);
-                        return checksum;
+                        printByteArray(response_bytes, "Firmware sent Checksum response");
+                        int response_bytes_sent = printer.WriteSerialToHost(response_bytes, response_bytes.Length);
+                        return checksum;    // CHECKSUM
                     }
                 }
             }
             //      Else if NAK received
-            else if (ACK_NAK == NAK)
+            else if (ACK_NAK.SequenceEqual(NAK))
             {
+                //ClearBuffer(printer);
                 //      Ignore command – it will be resent
                 return nak;
             }
             else
-            {
-                return "Unknown byte";  // should never get to this 
+            {   // BANDAID
+                int max_size = 20;
+                byte[] nak_byte = new byte[response_size];
+                byte[] nak_bytes = new byte[max_size];
+                int num_received = 0;
+                int i = 0;
+                while (true)    // might get hung up here
+                {
+                    num_received = printer.ReadSerialFromHost(nak_byte, 1);
+                    if (num_received == 1)
+                    {
+                        i++;    // ++'s the number of bytes received
+                        nak_bytes[i] = nak_byte[nak_byte.Length - 1];    // fills the byte[] with the bytes starting at 1 for some reason
+                        num_received = 0;   // resets num_received
+                    }
+                    // NAK[0] because one byte long
+                    if (nak_bytes[i] == NAK[0]) // should I use .SequenceEqual()?
+                    {
+                        break;  // exit the wait loop
+                    }
+
+                }
+                ClearBuffer(printer);  // This should clear the buffer  
+                return "Found the bloody NAK";  // should never get to this but it does
             }
         }
 
         static byte[] ResponseMaker(string response_string)
         {
-            byte[] return_response = Encoding.ASCII.GetBytes(response_string);  // Make sure this encoding 
-            return return_response;
+            byte[] return_response = Encoding.ASCII.GetBytes(response_string);  // Make sure this encoding works
+            // to add the null_byte to the end
+            byte null_byte = 0x30;
+            byte[] new_response = new byte[return_response.Length + 1];
+            return_response.CopyTo(new_response, 0);
+            new_response[new_response.Length - 1] = null_byte;
+            return new_response;
         }
 
-        static void ProcessCommand(byte[] packet, PrinterControl printer)
+        void ProcessCommand(byte[] packet, PrinterControl printer)
         {
             //      Process      // TYLER's Section, Recieves byte array . 
             /*  Byte 0:	  Command byte
@@ -190,13 +258,17 @@ namespace Firmware
             
              Note: what we need to know is which bytes corespond to controling which of the below commands.
              */
+
+            printByteArray(packet, "Firmware received successfully. Now in process command.");
             byte command = packet[0];
+
+            byte MoveGalvos_command = 0x00;
+            byte MoveZ_command = 0x01;
+            byte SetLaser_command = 0x02;
+            byte PrintDone_command = 0x03;
             //byte WaitMicroseconds_command = 0x00;
             //byte ResetStepper_command = 0x00;
-            byte MoveGalvos_command = 0x00;
             //byte RemoveModelFromPrinter_command = 0x00;
-            byte SetLaser_command = 0x00;
-            byte MoveZ_command = 0x00;
 
             //if (command == WaitMicroseconds_command) //WaitMicroseconds
             //{
@@ -221,7 +293,9 @@ namespace Firmware
 
                 float x = BitConverter.ToSingle(x_substring, 0);
                 float y = BitConverter.ToSingle(y_substring, 0);
-                printer.MoveGalvos(x, y);
+                float x_voltage = (float)(x * (2.5 / 100));  // find a better way to do these magic numbers
+                float y_voltage = (float)(y * (2.5 / 100));
+                printer.MoveGalvos(x, y);   // sends voltages to MoveGalvos();
             }
 
             //else if (command == RemoveModelFromPrinter_command) //RemoveModelFromPrinter
@@ -242,6 +316,27 @@ namespace Firmware
                 float z_frombottom = BitConverter.ToSingle(packet, 4);  // converting from byte[] starting at 4 to float
                 // zrailcontroller
             }
+            else if (command == PrintDone_command)
+            {
+                fDone = true;
+            }
+        }
+
+        static void printByteArray (byte[] bytesToPrint, string message)
+        {
+            return;
+            Console.Write(message);
+            Console.Write(" [");
+            bool firstIter = true;
+            foreach (var item in bytesToPrint)
+            {
+                if (firstIter)
+                    firstIter = false;
+                else
+                    Console.Write(", ");
+                Console.Write(item.ToString());
+            }
+            Console.WriteLine("] \n");
         }
     }
 }
