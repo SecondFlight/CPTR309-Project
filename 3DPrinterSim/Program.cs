@@ -59,6 +59,7 @@ namespace PrinterSimulator
             double currentY = 0;
             double currentZ = 0;
             bool isLaserOn = false;
+            bool oldIsLaserOn = false;
 
             int instructionCount = 0;
 
@@ -173,8 +174,9 @@ namespace PrinterSimulator
                         // Separately, if it contains an E
                         // Command number: 0x02
                         // Format: isLaserOn (1 byte)
-                        if (containsE)
+                        if (containsE && (isLaserOn != oldIsLaserOn))
                         {
+                            oldIsLaserOn = isLaserOn;
                             instructionCount++;
                             //continue;
                             var bytesToSend = new byte[8];
@@ -253,7 +255,7 @@ namespace PrinterSimulator
                 return false;
             }
 
-            Console.Write("+++++++++++++++NEXT COMMAND++++++++++++++++ \n");
+            //Console.Write("+++++++++++++++NEXT COMMAND++++++++++++++++ \n");
             //        Host-to-Firmware Communication Procedure
             const int header_size = 4;    // 4 is header size
             int response_size = 1;  // So it reads one byte at a time
@@ -268,7 +270,7 @@ namespace PrinterSimulator
             byte[] checksummed_packet = Checksum(packet);
             byte[] header = checksummed_packet.Skip(0).Take(header_size).ToArray();   // array substring from Skip and Take, 0 to 4
             var header_copy = header.ToArray();   // making a copy for header to go in so it doesn't change it
-            //printByteArray(header_copy, "Host sending header");
+            printByteArray(header_copy, "Host sending header");
             int header_bytes_sent = simCtl.WriteSerialToFirmware(header_copy, header_size);
 
             //      Read header bytes back from firmware to verify correct receipt of command header
@@ -292,7 +294,7 @@ namespace PrinterSimulator
 
                 //      Send rest of packet not including the 4-byte header
                 byte[] rest_bytes_send = checksummed_packet.Skip(header_size).Take(checksummed_packet.Length - header_size).ToArray();  // array substring
-                //printByteArray(rest_bytes_send, "Host sending remaining bytes");
+                printByteArray(rest_bytes_send, "Host sending remaining bytes");
                 int rest_bytes_sent = simCtl.WriteSerialToFirmware(rest_bytes_send, packet.Length - header_size);   // change last argument to parameter data length in the 4th byte
 
                 //      Wait for first byte of response to be received
@@ -325,7 +327,7 @@ namespace PrinterSimulator
                 }
                 var new_response = response_bytes.Skip(1).Take(i - 1).ToArray();    // i - 1 to take off the null and skip 1 to get rid of the 0 in first
                 string response_string = System.Text.Encoding.ASCII.GetString(new_response);    // converts from byte[] to string
-                //printByteArray(response_bytes, "Host received response string " + response_string);
+                printByteArray(response_bytes, "Host received response string " + response_string);
 
 
 
@@ -356,6 +358,7 @@ namespace PrinterSimulator
 
         static void printByteArray(byte[] bytesToPrint, string message)
         {
+            return;
             Console.Write(message);
             Console.Write(" [");
             bool firstIter = true;

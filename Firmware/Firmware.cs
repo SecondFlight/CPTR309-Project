@@ -33,8 +33,10 @@ namespace Firmware
             {
                 
                 string result = FirmwareToHost(printer);
+                if (fDone)
+                    break;
                 num_commands++;
-                Console.Write(result + " " + num_commands + "\n");
+                //Console.Write(result + " " + num_commands + "\n");
             }
             //test++;
             //FirmwareToHost(printer);
@@ -96,7 +98,7 @@ namespace Firmware
                 }
             }
         }
-        static string FirmwareToHost(PrinterControl printer) // took out byte[] packet, // need to change the return type to the same as the host side
+        string FirmwareToHost(PrinterControl printer) // took out byte[] packet, // need to change the return type to the same as the host side
         {
             //Firmware-to-Host Communication Procedure
             int header_size = 4;    // 4 is header size
@@ -118,11 +120,11 @@ namespace Firmware
                 ; // wait
             }
             ClearBuffer(printer);  // This should clear the buffer  
-            //printByteArray(header_recieved, "Firmware received header");
+            printByteArray(header_recieved, "Firmware received header");
 
             //      Write 4-byte header back to host
             byte[] header_sent = header_recieved.ToArray();
-            //printByteArray(header_sent, "Firmware sent header");
+            printByteArray(header_sent, "Firmware sent header");
             int header_bytes_sent = printer.WriteSerialToHost(header_sent, header_size);
 
             //      Read ACK/NAK byte
@@ -153,13 +155,13 @@ namespace Firmware
                     }    
                 }
                 ClearBuffer(printer);  // This should clear the buffer  
-                //printByteArray(rest_bytes, "Firmware received data");
+                printByteArray(rest_bytes, "Firmware received data");
                 //      If insufficient bytes are received
                 if (timeout_test)   // if number of bytes recieved is less than number of bytes sent
                 {
                     //      return “TIMEOUT”
                     byte[] response_bytes = ResponseMaker(timeout);
-                    //printByteArray(response_bytes, "Firmware sent response");
+                    printByteArray(response_bytes, "Firmware sent response");
                     int response_bytes_sent = printer.WriteSerialToHost(response_bytes, response_size);
                     return timeout;
                 }
@@ -183,7 +185,7 @@ namespace Firmware
 
                         //      Return “SUCCESS” or “VERSION n.n”
                         byte[] response_bytes = ResponseMaker(success);
-                        //printByteArray(response_bytes, "Firmware sent Success or Version response");
+                        printByteArray(response_bytes, "Firmware sent Success or Version response");
                         int response_bytes_sent = printer.WriteSerialToHost(response_bytes, response_bytes.Length);
                         //ClearBuffer(printer);  // This should clear the buffer  
                         return success; // SUCCESS
@@ -193,7 +195,7 @@ namespace Firmware
                     {
                         //      Return “CHECKSUM”
                         byte[] response_bytes = ResponseMaker(checksum);
-                        //printByteArray(response_bytes, "Firmware sent Checksum response");
+                        printByteArray(response_bytes, "Firmware sent Checksum response");
                         int response_bytes_sent = printer.WriteSerialToHost(response_bytes, response_bytes.Length);
                         return checksum;    // CHECKSUM
                     }
@@ -245,7 +247,7 @@ namespace Firmware
             return new_response;
         }
 
-        static void ProcessCommand(byte[] packet, PrinterControl printer)
+        void ProcessCommand(byte[] packet, PrinterControl printer)
         {
             //      Process      // TYLER's Section, Recieves byte array . 
             /*  Byte 0:	  Command byte
@@ -261,8 +263,9 @@ namespace Firmware
             byte command = packet[0];
 
             byte MoveGalvos_command = 0x00;
-            byte SetLaser_command = 0x00;
-            byte MoveZ_command = 0x00;
+            byte MoveZ_command = 0x01;
+            byte SetLaser_command = 0x02;
+            byte PrintDone_command = 0x03;
             //byte WaitMicroseconds_command = 0x00;
             //byte ResetStepper_command = 0x00;
             //byte RemoveModelFromPrinter_command = 0x00;
@@ -313,10 +316,15 @@ namespace Firmware
                 float z_frombottom = BitConverter.ToSingle(packet, 4);  // converting from byte[] starting at 4 to float
                 // zrailcontroller
             }
+            else if (command == PrintDone_command)
+            {
+                fDone = true;
+            }
         }
 
         static void printByteArray (byte[] bytesToPrint, string message)
         {
+            return;
             Console.Write(message);
             Console.Write(" [");
             bool firstIter = true;
