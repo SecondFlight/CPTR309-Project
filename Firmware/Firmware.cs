@@ -28,10 +28,13 @@ namespace Firmware
             //{
             //}
             //int test = 0;
+            int num_commands = 0;
             while (true)
             {
+                
                 string result = FirmwareToHost(printer);
-                Console.Write(result + "\n");
+                num_commands++;
+                Console.Write(result + " " + num_commands + "\n");
             }
             //test++;
             //FirmwareToHost(printer);
@@ -115,11 +118,11 @@ namespace Firmware
                 ; // wait
             }
             ClearBuffer(printer);  // This should clear the buffer  
-            printByteArray(header_recieved, "Firmware received header");
+            //printByteArray(header_recieved, "Firmware received header");
 
             //      Write 4-byte header back to host
             byte[] header_sent = header_recieved.ToArray();
-            printByteArray(header_sent, "Firmware sent header");
+            //printByteArray(header_sent, "Firmware sent header");
             int header_bytes_sent = printer.WriteSerialToHost(header_sent, header_size);
 
             //      Read ACK/NAK byte
@@ -128,7 +131,7 @@ namespace Firmware
             {
                 ; // wait
             }
-            ClearBuffer(printer);  // This should clear the buffer  
+            //ClearBuffer(printer);  // This should clear the buffer  
             printByteArray(ACK_NAK, "Firmware received ACK or NAK");
             //      If ACK received
             if (ACK_NAK.SequenceEqual(ACK))
@@ -150,13 +153,13 @@ namespace Firmware
                     }    
                 }
                 ClearBuffer(printer);  // This should clear the buffer  
-                printByteArray(rest_bytes, "Firmware received data");
+                //printByteArray(rest_bytes, "Firmware received data");
                 //      If insufficient bytes are received
                 if (timeout_test)   // if number of bytes recieved is less than number of bytes sent
                 {
                     //      return “TIMEOUT”
                     byte[] response_bytes = ResponseMaker(timeout);
-                    printByteArray(response_bytes, "Firmware sent response");
+                    //printByteArray(response_bytes, "Firmware sent response");
                     int response_bytes_sent = printer.WriteSerialToHost(response_bytes, response_size);
                     return timeout;
                 }
@@ -180,8 +183,9 @@ namespace Firmware
 
                         //      Return “SUCCESS” or “VERSION n.n”
                         byte[] response_bytes = ResponseMaker(success);
-                        printByteArray(response_bytes, "Firmware sent Success or Version response");
+                        //printByteArray(response_bytes, "Firmware sent Success or Version response");
                         int response_bytes_sent = printer.WriteSerialToHost(response_bytes, response_bytes.Length);
+                        //ClearBuffer(printer);  // This should clear the buffer  
                         return success; // SUCCESS
                     }
                     //      Else
@@ -189,19 +193,16 @@ namespace Firmware
                     {
                         //      Return “CHECKSUM”
                         byte[] response_bytes = ResponseMaker(checksum);
-                        printByteArray(response_bytes, "Firmware sent Checksum response");
-                        //while(printer.WriteSerialToHost(response_bytes, response_size) == 1)
-                        //{
-                        //    ; // wait for all to send
-                        //}
+                        //printByteArray(response_bytes, "Firmware sent Checksum response");
                         int response_bytes_sent = printer.WriteSerialToHost(response_bytes, response_bytes.Length);
-                        return checksum;
+                        return checksum;    // CHECKSUM
                     }
                 }
             }
             //      Else if NAK received
-            else if (ACK_NAK == NAK)
+            else if (ACK_NAK.SequenceEqual(NAK))
             {
+                //ClearBuffer(printer);
                 //      Ignore command – it will be resent
                 return nak;
             }
