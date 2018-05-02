@@ -247,7 +247,7 @@ namespace PrinterSimulator
          *   (internal) currentRetry: Used internally to track the current retry count
          */
 
-            // MAKE SURE TO CHANGE MAXRETI
+        // MAKE SURE TO CHANGE MAXRETI
         static bool HostToFirmware(byte[] packet, PrinterControl simCtl, int maxRetries = 10, int currentRetry = 0) // MAKE COPIES OF ALL THE THINGS
         {
             if (currentRetry >= maxRetries)
@@ -276,7 +276,7 @@ namespace PrinterSimulator
             //      Read header bytes back from firmware to verify correct receipt of command header
             byte[] possible_header = new byte[header_size];
             // int header_bytes_recieved = simCtl.ReadSerialFromFirmware(possible_header, header_size);
-            
+
             while (simCtl.ReadSerialFromFirmware(possible_header, header_size) < header_size)    // function inside returns header_bytes_recieved
             {
                 ;  // wait for four bytes to be recieved // 4 bytes
@@ -307,7 +307,7 @@ namespace PrinterSimulator
                 while (true)    // might get hung up here
                 {
                     num_received = simCtl.ReadSerialFromFirmware(response_byte, 1);
-                    if(num_received == 1)
+                    if (num_received == 1)
                     {
                         i++;    // ++'s the number of bytes received
                         response_bytes[i] = response_byte[response_byte.Length - 1];    // fills the byte[] with the bytes starting at 1 for some reason
@@ -435,7 +435,7 @@ namespace PrinterSimulator
                     case 'T': // Test menu
                         break;
 
-                    case 'Q' :  // Quite
+                    case 'Q':  // Quite
                         printer.Stop();
                         firmware.Stop();
                         fDone = true;
@@ -443,7 +443,6 @@ namespace PrinterSimulator
                 }
 
             }
-
         }
     }
 }
