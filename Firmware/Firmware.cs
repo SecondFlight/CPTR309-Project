@@ -15,9 +15,22 @@ namespace Firmware
         bool fDone = false;
         bool fInitialized = false;
 
+        float currentLocation;
+        const int top = 100; // mm
+        const int bottom = 0; //mm
+        const int Acceleration = 4; // mm/s^2
+        const int maxVelocity = 40; // mm/s
+        bool firstCommand;
+     
+
+
         public FirmwareController(PrinterControl printer)
         {
             this.printer = printer;
+            currentLocation = -1; //setting it to an unknown state
+            //moveTop(printer);
+            firstCommand = true;
+           
         }
 
         // Handle incoming commands from the serial link
@@ -258,6 +271,14 @@ namespace Firmware
             
              Note: what we need to know is which bytes corespond to controling which of the below commands.
              */
+            
+            if (firstCommand)
+            {
+                printer.ResetStepper();
+                moveTop(printer);
+                firstCommand = false;
+                
+            }
 
             printByteArray(packet, "Firmware received successfully. Now in process command.");
             byte command = packet[0];
@@ -295,7 +316,7 @@ namespace Firmware
                 float y = BitConverter.ToSingle(y_substring, 0);
                 float x_voltage = (float)(x * (2.5 / 100));  // find a better way to do these magic numbers
                 float y_voltage = (float)(y * (2.5 / 100));
-                printer.MoveGalvos(x, y);   // sends voltages to MoveGalvos();
+                printer.MoveGalvos(x_voltage, y_voltage);   // sends voltages to MoveGalvos();
             }
 
             //else if (command == RemoveModelFromPrinter_command) //RemoveModelFromPrinter
@@ -314,14 +335,16 @@ namespace Firmware
             {
                 // convert from byte to float
                 float z_frombottom = BitConverter.ToSingle(packet, 4);  // converting from byte[] starting at 4 to float
+                //printer.ResetStepper();
+                movementWithSpeed(printer, calculateDirection(printer, z_frombottom), CalculateDistance(printer, z_frombottom));
                 // zrailcontroller
             }
             else if (command == PrintDone_command)
             {
                 fDone = true;
+                moveTop(printer);
             }
-        }
-
+        } 
         static void printByteArray (byte[] bytesToPrint, string message)
         {
             return;
@@ -338,5 +361,263 @@ namespace Firmware
             }
             Console.WriteLine("] \n");
         }
-    }
+
+        public void moveTop(PrinterControl printer)
+        {
+            movementWithSpeed(printer, PrinterControl.StepperDir.STEP_UP, top);
+            currentLocation = 100;
+        }
+
+        public void moveBottom(PrinterControl printer)
+        {
+            movementWithSpeed(printer, PrinterControl.StepperDir.STEP_DOWN, bottom);
+            currentLocation = 0;
+        }
+
+        public float CalculateDistance(PrinterControl printer, float Position)
+        {
+            var distance = Math.Abs(currentLocation - Position);
+            return distance;
+        }
+
+        public PrinterControl.StepperDir calculateDirection(PrinterControl printer, float Position)
+        {
+            var distance = currentLocation - Position;
+            if (distance > 0)
+            {
+                return PrinterControl.StepperDir.STEP_DOWN;
+            }
+            else
+            {
+                return PrinterControl.StepperDir.STEP_UP;
+            }
+        }
+
+        public void movementWithSpeed(PrinterControl printer, PrinterControl.StepperDir dir, float distance)
+        {
+            float velocity = 0;
+            float distanceTraveled = 0;
+            while (currentLocation == -1 && !(printer.LimitSwitchPressed()))
+            {
+                
+                velocity += Acceleration;
+                //Thread.Sleep(1000);
+                for (var i = 0; i < velocity; i++)
+                {
+                    for (var j = 0; j < 400; j++)
+                    {
+                        if (printer.LimitSwitchPressed())
+                            break;
+                        printer.StepStepper(dir);
+                        distanceTraveled += (float)(1.0 / 400);
+                        printer.WaitMicroseconds(625);
+
+
+                    }
+                    if (printer.LimitSwitchPressed())
+                        break;
+                }
+                
+                //printer.StepStepper(dir);
+            }
+                    if (((dir == PrinterControl.StepperDir.STEP_DOWN) && (currentLocation - distance > 0) && (!printer.LimitSwitchPressed()|| (currentLocation != -1))))
+            {
+                while (distanceTraveled < distance)
+                {
+                    
+                    if (velocity < maxVelocity && (velocity + Acceleration < maxVelocity))
+                        velocity += Acceleration;
+                    else if (velocity < maxVelocity && (maxVelocity - velocity < Acceleration)) //allows us to reach max velocity without overshooting
+                        velocity = maxVelocity;
+                    //Thread.Sleep(1000); 
+                    for (var i = 0; i < velocity; i++)
+                    {
+                        for (var j = 0; j < 400; j++)
+                        {
+                            if (distanceTraveled >= distance || (printer.LimitSwitchPressed() && (currentLocation == -1)))
+                                break;
+                            printer.StepStepper(dir);
+                            //printer.WaitMicroseconds(5);
+                            distanceTraveled += (float)(1.0 / 400);
+                            //printer.ResetStepper();
+                            printer.WaitMicroseconds(625);
+
+
+                        }
+                        if (distanceTraveled >= distance || printer.LimitSwitchPressed())
+                            break;
+                    }/*
+                    if (distanceTraveled + velocity < distance) //if we wont over shoot
+                    {
+                        distanceTraveled += velocity;
+                    }
+                    else //this happens if we're close but the velocity will over shoot it should move the rest of the way without overshooting
+                    {
+                        //distanceTraveled += (velocity - distance);
+                        velocity = 0;
+                    }
+                    */
+                }
+                currentLocation -= distanceTraveled;
+            }
+            if ((dir == PrinterControl.StepperDir.STEP_UP) && currentLocation + distance < 100 && !printer.LimitSwitchPressed())
+            {
+                while (distanceTraveled < distance)
+                {
+                    if (velocity < maxVelocity && (velocity + Acceleration < maxVelocity))
+                        velocity += Acceleration;
+                    else if (velocity < maxVelocity && (maxVelocity - velocity < Acceleration))
+                        velocity = maxVelocity;
+                   // Thread.Sleep(1000);
+                    for (var i = 0; i < velocity; i++)
+                    {
+                        for (var j = 0; j < 400; j++)
+                        {
+                            if (distanceTraveled >= distance || printer.LimitSwitchPressed())
+                                break;
+                            printer.StepStepper(dir);
+                            
+                            distanceTraveled += (float)(1.0 / 400);
+                            //printer.ResetStepper();
+                            printer.WaitMicroseconds(625);
+
+                        }
+                        if (distanceTraveled >= distance || printer.LimitSwitchPressed())
+                            break;
+                    }
+                    
+                }
+                currentLocation += distanceTraveled;
+            }
+        }
+
+    /*public class zRailController
+    {
+        PrinterControl printer;
+        float currentLocation;
+        const int top = 100; // mm
+        const int bottom = 0; //mm
+        const int Acceleration = 4; // mm/s^2
+        const int maxVelocity = 40; // mm/s
+
+        public zRailController(ref PrinterControl printer)
+        {
+            this.printer = printer;
+            currentLocation = -1; //setting it to an unknown state
+            moveTop();
+        }
+
+        public void moveTop()
+        {
+            movementWithSpeed(PrinterControl.StepperDir.STEP_UP, top);
+            currentLocation = 100;
+        }
+
+        public void moveBottom()
+        {
+            movementWithSpeed(PrinterControl.StepperDir.STEP_DOWN, bottom);
+            currentLocation = 0;
+        }
+
+        public float CalculateDistance(float Position)
+        {
+            var distance = Math.Abs(currentLocation - Position);
+            return distance;
+        }
+
+        public PrinterControl.StepperDir calculateDirection(float Position)
+        {
+            var distance = currentLocation - Position;
+            if (distance > 0)
+            {
+                return PrinterControl.StepperDir.STEP_UP;
+            }
+            else
+            {
+                return PrinterControl.StepperDir.STEP_DOWN;
+            }
+        }
+
+        public void movementWithSpeed(PrinterControl.StepperDir dir, float distance)
+        {
+            float velocity = 0;
+            float distanceTraveled = 0;
+            if(printer == null)
+            {
+                Console.WriteLine("I hate everythihng");
+
+            }
+            while (currentLocation == -1 && !(printer.LimitSwitchPressed()) )
+            {
+                velocity += Acceleration;
+                Thread.Sleep(1000);
+                for (var i = 0; i < velocity; i++)
+                {
+                    for (var j = 0; j < 400; j++)
+                    {
+                        printer.StepStepper(dir);
+                        currentLocation += (float)0.0025;
+                    }
+                }
+            }
+            if ((dir == PrinterControl.StepperDir.STEP_DOWN) && (currentLocation - distance > 0))
+            //TODO: if the distance is too much it will calculate the rest of the way to go to the bottom and just do that
+            {
+                while (distanceTraveled < distance)
+                {
+                    if (velocity < maxVelocity && (velocity + Acceleration < maxVelocity))
+                        velocity += Acceleration;
+                    else if (velocity < maxVelocity && (maxVelocity - velocity < Acceleration)) //allows us to reach max velocity without overshooting
+                        velocity = maxVelocity;
+                    Thread.Sleep(1000); //in a perfect world I'd time the next few loops and accamodate but i also dont feel like it
+                    for (var i = 0; i < velocity; i++)
+                    {
+                        for (var j = 0; j < 400; j++)
+                        {
+                            printer.StepStepper(dir);
+                        }
+                    }
+                    if (distanceTraveled + velocity < distance) //if we wont over shoot
+                    {
+                        distanceTraveled += velocity;
+                    }
+                    else //this happens if we're close but the velocity will over shoot it should move the rest of the way without overshooting
+                    {
+                        distanceTraveled += (distance - velocity);
+                    }
+
+                }
+                currentLocation -= distance;
+            }
+            if ((dir == PrinterControl.StepperDir.STEP_UP) && currentLocation + distance < 100)
+            {
+                while (distanceTraveled < distance)
+                {
+                    if (velocity < maxVelocity && (velocity + Acceleration < maxVelocity))
+                        velocity += Acceleration;
+                    else if (velocity < maxVelocity && (maxVelocity - velocity < Acceleration))
+                        velocity = maxVelocity;
+                    Thread.Sleep(1000);
+                    for (var i = 0; i < velocity; i++)
+                    {
+                        for (var j = 0; j < 400; j++)
+                        {
+                            printer.StepStepper(dir);
+                        }
+                    }
+                    if (distanceTraveled + velocity < distance) //if we wont over shoot
+                    {
+                        distanceTraveled += velocity;
+                    }
+                    else //this happens if we're close but the velocity will over shoot it should move the rest of the way without overshooting
+                    {
+                        distanceTraveled += (distance - velocity);
+                    }
+                    currentLocation += distance;
+                }
+            }
+        }
+
+    }*/
+}
 }
