@@ -31,13 +31,16 @@ namespace Firmware
             int num_commands = 0;
             while (true)
             {
-                
+                //printer.SetLaser(true);
+                //printer.SetLaser(true);
                 string result = FirmwareToHost(printer);
                 if (fDone)
                     break;
                 num_commands++;
                 //Console.Write(result + " " + num_commands + "\n");
             }
+
+
             //test++;
             //FirmwareToHost(printer);
         }
@@ -295,7 +298,7 @@ namespace Firmware
                 float y = BitConverter.ToSingle(y_substring, 0);
                 float x_voltage = (float)(x * (2.5 / 100));  // find a better way to do these magic numbers
                 float y_voltage = (float)(y * (2.5 / 100));
-                printer.MoveGalvos(x, y);   // sends voltages to MoveGalvos();
+                this.printer.MoveGalvos(x, y);   // sends voltages to MoveGalvos();
             }
 
             //else if (command == RemoveModelFromPrinter_command) //RemoveModelFromPrinter
@@ -308,7 +311,7 @@ namespace Firmware
             {
                 // convert from byte to bool
                 bool set = BitConverter.ToBoolean(packet, 4);
-                printer.SetLaser(set);
+                this.printer.SetLaser(set);
             }
             else if (command == MoveZ_command)
             {
@@ -321,7 +324,6 @@ namespace Firmware
                 fDone = true;
             }
         }
-
         static void printByteArray (byte[] bytesToPrint, string message)
         {
             return;
@@ -340,3 +342,6 @@ namespace Firmware
         }
     }
 }
+
+
+

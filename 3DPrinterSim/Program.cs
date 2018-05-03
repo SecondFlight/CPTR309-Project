@@ -130,7 +130,7 @@ namespace PrinterSimulator
                             }
 
                             // Send data
-                            if (!HostToFirmware(bytesToSend, simCtl))   // NOTE: the first byte here is 8!!!!!!!!!!!!!=============
+                            if (!HostToFirmware(bytesToSend, simCtl))
                             {
                                 //Console.Write("retry");
                                 Console.WriteLine("Print failed - command failed to send.");
@@ -166,7 +166,7 @@ namespace PrinterSimulator
                                 return;
                             }
                         }
-                        else if (containsX || containsY)
+                        else if (containsX || containsY)    // what if they need to just go in the X or Y direction without the other?
                         {
                             throw new InvalidDataException("Invalid GCode command - command contains one X/Y command without the other.");
                         }
