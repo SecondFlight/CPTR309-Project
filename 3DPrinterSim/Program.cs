@@ -420,6 +420,7 @@ namespace PrinterSimulator
             while (!fDone)
             {
                 //Console.Clear();
+                Console.WriteLine("Version 1.0.0");
                 Console.WriteLine("3D Printer Simulation - Control Menu\n");
                 Console.WriteLine("P - Print");
                 Console.WriteLine("T - Test");
