@@ -372,7 +372,171 @@ namespace PrinterSimulator
             }
             Console.WriteLine("] \n");
         }
+        static void Testing(PrinterControl simCtl)
+        {
+            // add in menu for each test
+            Console.Write("\n");
+            Console.Write("Testing Menu: \n");
+            while (true)
+            {
+                Console.Write("A - Test Z-rail \n");
+                Console.Write("B - Test Gavlos \n");
+                Console.Write("C - Test Laser \n");
+                Console.Write("D - Test Limit switch \n");
+                Console.Write("Z - To exit \n");
 
+                char ch = Char.ToUpper(Console.ReadKey().KeyChar);
+                switch (ch)
+                {
+                    case 'A': // Print
+                        TestZ(simCtl, 1.2);
+                        break;
+
+                    case 'B': // Test menu
+                        TestGalvos(simCtl, 1.2, 1.2);
+                        break;
+
+                    case 'C':  // Quite
+                        TestLaser(simCtl, true);
+                        break;
+
+                    case 'D':
+                        TestLimit(simCtl, 100);
+                        break;
+                    case 'Z':
+                        return;
+                }
+            }
+        }
+        static void TestLimit(PrinterControl simCtl, int currentZ)
+        {
+            var bytesToSend = new byte[8];
+            bytesToSend[0] = 0x01; // Command number
+            bytesToSend[1] = 0x04; // Data length   // changed from 04
+            bytesToSend[2] = 0x00; // Blank (for checksum)
+            bytesToSend[3] = 0x00; // Blank (for checksum)
+
+            // Convert z position to a byte array
+            var zBytes = BitConverter.GetBytes((float)currentZ);
+
+            // Insert z position
+            for (int i = 0; i < zBytes.Length; i++)
+            {
+                bytesToSend[i + 4] = zBytes[i];
+            }
+
+            // Send data
+            if (!HostToFirmware(bytesToSend, simCtl))
+            {
+                Console.WriteLine(" \n Test failed - command failed to send.  \n");
+                return;
+            }
+            else if(HostToFirmware(bytesToSend, simCtl) && simCtl.LimitSwitchPressed())
+            {
+                Console.Write(" \n Successful test: limit switch pressed \n");
+                return;
+            }
+            else if (!simCtl.LimitSwitchPressed())
+            {
+                Console.WriteLine(" \n Test failed - command failed to send.  \n");
+                return;
+            }
+        }
+        static void TestLaser(PrinterControl simCtl, bool isLaserOn)
+        {
+            var bytesToSend = new byte[8];
+            bytesToSend[0] = 0x02; // Command number
+            bytesToSend[1] = 0x01; // Data length
+            bytesToSend[2] = 0x00; // Blank (for checksum)
+            bytesToSend[3] = 0x00; // Blank (for checksum)
+
+            // Convert z position to a byte array
+            var isLaserOnBytes = BitConverter.GetBytes(isLaserOn);
+
+            // Insert isLaserOn
+            for (int i = 0; i < isLaserOnBytes.Length; i++)
+            {
+                bytesToSend[i + 4] = isLaserOnBytes[i];
+            }
+
+            // Send data
+            if (!HostToFirmware(bytesToSend, simCtl))
+            {
+                Console.WriteLine(" \n Print failed - command failed to send.");
+                return;
+            }
+            else
+            {
+                Console.Write(" \n Successful test: Laser \n");
+                return;
+            }
+        }
+        static void TestGalvos(PrinterControl simCtl, double currentX, double currentY)
+        {
+            var bytesToSend = new byte[12];
+            bytesToSend[0] = 0x00; // Command number
+            bytesToSend[1] = 0x08; // Data length
+            bytesToSend[2] = 0x00; // Blank (for checksum)
+            bytesToSend[3] = 0x00; // Blank (for checksum)
+
+            // Convert x position and y position to a byte array
+            var xBytes = BitConverter.GetBytes((float)currentX);
+            var yBytes = BitConverter.GetBytes((float)currentY);
+
+            // Insert x position
+            for (int i = 0; i < xBytes.Length; i++)
+            {
+                bytesToSend[i + 4] = xBytes[i];
+            }
+
+            // Insert y position
+            for (int i = 0; i < yBytes.Length; i++)
+            {
+                bytesToSend[i + 8] = yBytes[i];
+            }
+
+            // Send data
+            if (!HostToFirmware(bytesToSend, simCtl))
+            {
+                //Console.Write("retry");
+                Console.WriteLine(" \n Test failed - command failed to send.");
+                return;
+            }
+            else
+            {
+                Console.Write(" \n Successful test: Galvos\n");
+                return;
+            }
+        }
+        static void TestZ(PrinterControl simCtl, double currentZ)
+        {
+            var bytesToSend = new byte[8];
+            bytesToSend[0] = 0x01; // Command number
+            bytesToSend[1] = 0x04; // Data length   // changed from 04
+            bytesToSend[2] = 0x00; // Blank (for checksum)
+            bytesToSend[3] = 0x00; // Blank (for checksum)
+
+            // Convert z position to a byte array
+            var zBytes = BitConverter.GetBytes((float)currentZ);
+
+            // Insert z position
+            for (int i = 0; i < zBytes.Length; i++)
+            {
+                bytesToSend[i + 4] = zBytes[i];
+            }
+
+            // Send data
+            if (!HostToFirmware(bytesToSend, simCtl))
+            {
+                Console.WriteLine(" \n Test failed - command failed to send.");
+                return;
+            }
+            else
+            {
+                Console.Write(" \n Successful test: Z rail\n");
+                return;
+            }
+        }
         //  This function will be later moved to Firmware.cs as it is Firmware to Host side of things
 
 
@@ -433,6 +597,7 @@ namespace PrinterSimulator
                         break;
 
                     case 'T': // Test menu
+                        Testing(printer.GetPrinterSim());
                         break;
 
                     case 'Q':  // Quite
